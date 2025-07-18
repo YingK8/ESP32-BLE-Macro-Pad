@@ -4,4 +4,6 @@
   (lib (name "DM-OLED096-636")(type "KiCad")(uri "${KIPRJMOD}/components/DM-OLED096-636")(options "")(descr ""))
   (lib (name "nice-nano-kicad")(type "KiCad")(uri "${KIPRJMOD}/components/nice-nano-kicad")(options "")(descr ""))
   (lib (name "PEC12R_4225F_S0024")(type "KiCad")(uri "${KIPRJMOD}/components/PEC12R_4225F_S0024")(options "")(descr ""))
+  (lib (name "12402012E212A")(type "KiCad")(uri "${KIPRJMOD}/components/12402012E212A")(options "")(descr ""))
+  (lib (name "ABM8_16_000MHZ_D1X_T")(type "KiCad")(uri "${KIPRJMOD}/components/ABM8_16_000MHZ_D1X_T")(options "")(descr ""))
 )
