@@ -1,0 +1,13 @@
+(unit MM)
+
+(package "nRF52840-QFAA-F-R7"
+    (type UNDEF)
+    (uver 2)
+    (cuser "SamacSys")
+    (uuser "SamacSys")
+    (utime 2023-02-27-13:03:14)
+    (mountForm default
+        (footprintRef "QFN40P600X600X95-49N-D")
+        (spec "System")
+    )
+)

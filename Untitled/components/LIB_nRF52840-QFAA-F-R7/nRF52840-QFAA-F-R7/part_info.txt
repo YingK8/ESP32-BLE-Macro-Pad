@@ -1,0 +1,9 @@
+Manufacturer=Nordic Semiconductor
+PartNumber=nRF52840-QFAA-F-R7
+PartCategory=Integrated Circuit
+PackageCategory=Quad Flat No-Lead
+PinCount=49
+Version=1.1
+Released=2023-02-27 13:03:14
+Downloaded=2025-07-20 20:33:25
+3D=Y

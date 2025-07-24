@@ -6,4 +6,8 @@
   (lib (name "PEC12R_4225F_S0024")(type "KiCad")(uri "${KIPRJMOD}/components/PEC12R_4225F_S0024")(options "")(descr ""))
   (lib (name "12402012E212A")(type "KiCad")(uri "${KIPRJMOD}/components/12402012E212A")(options "")(descr ""))
   (lib (name "ABM8_16_000MHZ_D1X_T")(type "KiCad")(uri "${KIPRJMOD}/components/ABM8_16_000MHZ_D1X_T")(options "")(descr ""))
+  (lib (name "ECS_320_8_37B_CKY_TR")(type "KiCad")(uri "${KIPRJMOD}/components/ECS_320_8_37B_CKY_TR")(options "")(descr ""))
+  (lib (name "AMCA31_2R450G_S1F_T3")(type "KiCad")(uri "${KIPRJMOD}/components/AMCA31_2R450G_S1F_T3")(options "")(descr ""))
+  (lib (name "KiCad")(type "KiCad")(uri "${KIPRJMOD}/components/LIB_nRF52840-QFAA-F-R7/nRF52840-QFAA-F-R7/KiCad")(options "")(descr ""))
+  (lib (name "MCP73831T_2ACI_OT")(type "KiCad")(uri "${KIPRJMOD}/components/MCP73831T_2ACI_OT")(options "")(descr ""))
 )

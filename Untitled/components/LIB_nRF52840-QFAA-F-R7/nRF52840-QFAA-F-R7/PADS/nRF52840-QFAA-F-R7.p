@@ -1,0 +1,66 @@
+*PADS-LIBRARY-PART-TYPES-V9*
+
+nRF52840-QFAA-F-R7 QFN40P600X600X95-49N-D I ANA 7 1 0 0 0
+TIMESTAMP 2025.07.20.20.33.25
+"Mouser Part Number" 949-NRF52840QFAAF-R7
+"Mouser Price/Stock" https://www.mouser.co.uk/ProductDetail/Nordic-Semiconductor/nRF52840-QFAA-F-R7?qs=TCDPyi3sCW2TA2kPWr8xHQ%3D%3D
+"Manufacturer_Name" Nordic Semiconductor
+"Manufacturer_Part_Number" nRF52840-QFAA-F-R7
+"Description" RF System on a Chip - SoC Multiprotocol Bluetooth 5.3 SoC supporting Bluetooth Low Energy, Bluetooth mesh, NFC, Thread and Zigbee
+"Datasheet Link" https://infocenter.nordicsemi.com/pdf/nRF52840_PS_v1.7.pdf
+"Geometry.Height" 0.95mm
+GATE 1 49 0
+nRF52840-QFAA-F-R7
+1 0 U DEC1
+2 0 U P0.00/XL1
+3 0 U P0.01/XL2
+4 0 U P0.04/AIN2
+5 0 U P0.05/AIN3
+6 0 U P0.07/TRACECLK
+7 0 U P0.08
+8 0 U P1.08
+9 0 U P1.09/TRACEDATA3
+10 0 U P0.11/TRACEDATA2
+11 0 U P0.12/TRACEDATA1
+12 0 U VDD_1
+13 0 U P0.13
+14 0 U P0.14
+15 0 U P0.17
+16 0 U P0.18/NRESET
+17 0 U VDD_2
+18 0 U P0.19
+19 0 U P0.20
+20 0 U P0.21
+21 0 U P0.22
+22 0 U P0.23
+23 0 U P0.24
+24 0 U P1.00/TRACEDATA0
+36 0 U XC2
+35 0 U XC1
+34 0 U DEC3
+33 0 U DEC6
+32 0 U VSS_PA
+31 0 U ANT
+30 0 U P0.10/NFC2
+29 0 U P0.09/NFC1
+28 0 U NC
+27 0 U SWDCLK
+26 0 U SWDIO
+25 0 U VDD_3
+49 0 U VSS_2
+48 0 U VDD_5
+47 0 U DCC
+46 0 U DEC4
+45 0 U VSS_1
+44 0 U P0.31/AIN7
+43 0 U P0.30/AIN6
+42 0 U P0.29/AIN5
+41 0 U P0.28/AIN4
+40 0 U P0.02/AIN0
+39 0 U P0.03/AIN1
+38 0 U P1.15
+37 0 U VDD_4
+
+*END*
+*REMARK* SamacSys ECAD Model
+15867091/1730743/2.50/49/3/Integrated Circuit
