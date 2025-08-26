@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": "../../../../../../Documents/PlatformIO/Projects/macro-pad"
+		},
+		{
+			"name": "macro-pad",
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"print": "cpp"
+		}
+	}
+}

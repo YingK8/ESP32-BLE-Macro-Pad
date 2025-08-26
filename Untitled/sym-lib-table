@@ -10,4 +10,7 @@
   (lib (name "2025-07-20_17-44-24")(type "KiCad")(uri "${KIPRJMOD}/components/KiCADv6/2025-07-20_17-44-24.kicad_sym")(options "")(descr ""))
   (lib (name "nRF52840-QFAA-F-R7")(type "Legacy")(uri "${KIPRJMOD}/components/LIB_nRF52840-QFAA-F-R7/nRF52840-QFAA-F-R7/KiCad/nRF52840-QFAA-F-R7.lib")(options "")(descr ""))
   (lib (name "MCP73831T-2ACI_OT")(type "KiCad")(uri "${KIPRJMOD}/components/MCP73831T_2ACI_OT/MCP73831T-2ACI_OT.kicad_sym")(options "")(descr ""))
+  (lib (name "2025-07-25_22-29-54")(type "KiCad")(uri "${KIPRJMOD}/components/BQ21040DBVR/2025-07-25_22-29-54.kicad_sym")(options "")(descr ""))
+  (lib (name "2025-07-25_23-02-08")(type "KiCad")(uri "${KIPRJMOD}/components/OS102011MA1QN1/2025-07-25_23-02-08.kicad_sym")(options "")(descr ""))
+  (lib (name "2025-08-06_00-06-31")(type "KiCad")(uri "${KIPRJMOD}/components/1825232_1/2025-08-06_00-06-31.kicad_sym")(options "")(descr ""))
 )
