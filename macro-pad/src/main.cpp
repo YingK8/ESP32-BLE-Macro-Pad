@@ -39,7 +39,10 @@ bool buttonState[ROWS][COLS] = {{false}};
 // --- Rotary Encoder Configuration ---
 #define ROT_A 9
 #define ROT_B 10
-int recent_clicks[5] = {0};
+#define RECENT_CLICKS_LEN 5
+// int recent_clicks[RECENT_CLICKS_LEN] = {0};
+// uint8_t click_index = 0;
+int oldPos = 0;
 RotaryEncoder encoder(ROT_A, ROT_B, RotaryEncoder::LatchMode::TWO03);
 
 // Combined HID Report Descriptor for Keyboard and Media Keys
@@ -234,9 +237,11 @@ void handleKeypad() {
 
 void handleEncoder() {
   encoder.tick();
+  // click_index = (click_index + 1) % RECENT_CLICKS_LEN;
   int newPos = encoder.getPosition();
+  // recent_clicks[click_index] = newPos;
 
-  if (newPos != oldPos && (millis() - rot_time) > 20) {
+  if (newPos != oldPos) {
     if (oldPos > newPos) {
       Serial.println("Encoder: Volume Up");
       sendMediaKey(0xE9); // Volume Up
