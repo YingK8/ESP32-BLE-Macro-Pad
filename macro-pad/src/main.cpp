@@ -1,329 +1,142 @@
+/*Using LVGL with Arduino requires some extra steps:
+ *Be sure to read the docs here: https://docs.lvgl.io/master/integration/framework/arduino.html  */
+
 #include <Arduino.h>
-#include <BLEDevice.h>
-#include <BLEUtils.h>
-#include <BLEServer.h>
-#include <BLE2902.h>
-#include <BLEHIDDevice.h>
-#include <RotaryEncoder.h>
+#include <lvgl.h>
+#include "demo.h"
 
-// BLE HID Objects
-BLEHIDDevice* hid;
-BLECharacteristic* keyboardInput;
-BLECharacteristic* mediaInput;
-bool isConnected = false;
 
-// --- Keypad Configuration ---
-const byte ROWS = 2;
-const byte COLS = 3;
+/*To use the built-in examples and demos of LVGL uncomment the includes below respectively.
+ *You also need to copy `lvgl/examples` to `lvgl/src/examples`. Similarly for the demos `lvgl/demos` to `lvgl/src/demos`.
+ *Note that the `lv_examples` library is for LVGL v7 and you shouldn't install it for this version (since LVGL v8)
+ *as the examples and demos are now part of the main LVGL library. */
 
-// Define keys - use special codes for media keys
-#define KEY_PLAY_PAUSE 0x01
-#define KEY_VOL_UP     0x02
-#define KEY_VOL_DOWN   0x03
+// #include <examples/lv_examples.h>
+// #include <demos/lv_demos.h>
 
-uint8_t keys[ROWS][COLS] = {
-  {'a', 'b', KEY_PLAY_PAUSE},  // Use codes instead of characters for media keys
-  {'d', 'e', 'f'}
-};
+/*Set to your screen resolution and rotation*/
+#define TFT_HOR_RES   320
+#define TFT_VER_RES   240
+#define TFT_ROTATION  LV_DISPLAY_ROTATION_0
 
-// Update these pins to match your ESP32 board's wiring
-byte rowPins[ROWS] = {5, 6};
-byte colPins[COLS] = {4, 7, 8};
+/*LVGL draw into this buffer, 1/10 screen size usually works well. The size is in bytes*/
+#define DRAW_BUF_SIZE (TFT_HOR_RES * TFT_VER_RES / 10 * (LV_COLOR_DEPTH / 8))
+uint32_t draw_buf[DRAW_BUF_SIZE / 4];
 
-// --- Keypad Debouncing Variables ---
-unsigned long lastDebounceTime[ROWS][COLS] = {0};
-unsigned long debounceDelay = 50;  // 50ms debounce time
-bool lastButtonState[ROWS][COLS] = {{false}};
-bool buttonState[ROWS][COLS] = {{false}};
+#if LV_USE_LOG != 0
+void my_print( lv_log_level_t level, const char * buf )
+{
+    LV_UNUSED(level);
+    Serial.println(buf);
+    Serial.flush();
+}
+#endif
 
-// --- Rotary Encoder Configuration ---
-#define ROT_A 9
-#define ROT_B 10
-#define RECENT_CLICKS_LEN 5
-// int recent_clicks[RECENT_CLICKS_LEN] = {0};
-// uint8_t click_index = 0;
-int oldPos = 0;
-RotaryEncoder encoder(ROT_A, ROT_B, RotaryEncoder::LatchMode::TWO03);
+/* LVGL calls it when a rendered image needs to copied to the display*/
+void my_disp_flush( lv_display_t *disp, const lv_area_t *area, uint8_t * px_map)
+{
+    /*Copy `px map` to the `area`*/
 
-// Combined HID Report Descriptor for Keyboard and Media Keys
-static const uint8_t hidReportDescriptor[] = {
-  // Keyboard Collection
-  0x05, 0x01,        // Usage Page (Generic Desktop Ctrls)
-  0x09, 0x06,        // Usage (Keyboard)
-  0xA1, 0x01,        // Collection (Application)
-  0x85, 0x01,        //   Report ID (1)
-  0x05, 0x07,        //   Usage Page (Key Codes)
-  0x19, 0xE0,        //   Usage Minimum (0xE0)
-  0x29, 0xE7,        //   Usage Maximum (0xE7)
-  0x15, 0x00,        //   Logical Minimum (0)
-  0x25, 0x01,        //   Logical Maximum (1)
-  0x75, 0x01,        //   Report Size (1)
-  0x95, 0x08,        //   Report Count (8)
-  0x81, 0x02,        //   Input (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position)
-  0x95, 0x01,        //   Report Count (1)
-  0x75, 0x08,        //   Report Size (8)
-  0x81, 0x01,        //   Input (Const,Array,Abs,No Wrap,Linear,Preferred State,No Null Position)
-  0x95, 0x05,        //   Report Count (5)
-  0x75, 0x01,        //   Report Size (1)
-  0x05, 0x08,        //   Usage Page (LEDs)
-  0x19, 0x01,        //   Usage Minimum (Num Lock)
-  0x29, 0x05,        //   Usage Maximum (Kana)
-  0x91, 0x02,        //   Output (Data,Var,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
-  0x95, 0x01,        //   Report Count (1)
-  0x75, 0x03,        //   Report Size (3)
-  0x91, 0x01,        //   Output (Const,Array,Abs,No Wrap,Linear,Preferred State,No Null Position,Non-volatile)
-  0x95, 0x06,        //   Report Count (6)
-  0x75, 0x08,        //   Report Size (8)
-  0x15, 0x00,        //   Logical Minimum (0)
-  0x25, 0x65,        //   Logical Maximum (101)
-  0x05, 0x07,        //   Usage Page (Key Codes)
-  0x19, 0x00,        //   Usage Minimum (0x00)
-  0x29, 0x65,        //   Usage Maximum (0x65)
-  0x81, 0x00,        //   Input (Data,Array,Abs,No Wrap,Linear,Preferred State,No Null Position)
-  0xC0,              // End Collection (Keyboard)
-  
-  // Media Keys Collection (Consumer Control)
-  0x05, 0x0C,        // Usage Page (Consumer)
-  0x09, 0x01,        // Usage (Consumer Control)
-  0xA1, 0x01,        // Collection (Application)
-  0x85, 0x02,        //   Report ID (2)
-  0x15, 0x00,        //   Logical Minimum (0)
-  0x26, 0xFF, 0x03,  //   Logical Maximum (1023)
-  0x75, 0x10,        //   Report Size (16)
-  0x95, 0x01,        //   Report Count (1)
-  0x19, 0x00,        //   Usage Minimum (0) - We now define a range of valid usages...
-  0x2A, 0xFF, 0x03,  //   Usage Maximum (1023) - ...instead of a single unassigned usage.
-  0x81, 0x00,        //   Input (Data,Array,Abs,No Wrap,Linear,Preferred State,No Null Position)
-  0xC0,              // End Collection (Consumer Control)
-};
+    /*For example ("my_..." functions needs to be implemented by you)
+    uint32_t w = lv_area_get_width(area);
+    uint32_t h = lv_area_get_height(area);
 
-// Map characters to HID keycodes
-uint8_t charToHidCode(char c) {
-  switch (c) {
-    case 'a': return 0x04;
-    case 'b': return 0x05;
-    case 'c': return 0x06;
-    case 'd': return 0x07;
-    case 'e': return 0x08;
-    case 'f': return 0x09;
-    default: return 0x00; // No key pressed
-  }
+    my_set_window(area->x1, area->y1, w, h);
+    my_draw_bitmaps(px_map, w * h);
+     */
+
+    /*Call it to tell LVGL you are ready*/
+    lv_display_flush_ready(disp);
 }
 
-// Map special codes to media keycodes
-uint16_t specialCodeToMediaCode(uint8_t code) {
-  switch (code) {
-    case KEY_PLAY_PAUSE: return 0xCD; // Play/Pause
-    case KEY_VOL_UP:     return 0xE9; // Volume Up
-    case KEY_VOL_DOWN:   return 0xEA; // Volume Down
-    default: return 0x00; // No media key
-  }
-}
+/*Read the touchpad*/
+void my_touchpad_read( lv_indev_t * indev, lv_indev_data_t * data )
+{
+    /*For example  ("my_..." functions needs to be implemented by you)
+    int32_t x, y;
+    bool touched = my_get_touch( &x, &y );
 
-class MyServerCallbacks : public BLEServerCallbacks {
-  void onConnect(BLEServer* pServer) {
-    isConnected = true;
-    Serial.println("Device connected");
-  }
-
-  void onDisconnect(BLEServer* pServer) {
-    isConnected = false;
-    Serial.println("Device disconnected");
-    // Restart advertising to allow reconnection
-    BLEDevice::startAdvertising();
-    Serial.println("Advertising restarted");
-  }
-};
-
-void sendMediaKey(uint16_t keyCode) {
-  if (!isConnected) {
-    Serial.println("Not connected to any device");
-    return;
-  }
-
-  // Convert the 16-bit key code to bytes (little-endian)
-  uint8_t report[2] = {static_cast<uint8_t>(keyCode & 0xFF), static_cast<uint8_t>((keyCode >> 8) & 0xFF)};
-  mediaInput->setValue(report, sizeof(report));
-  mediaInput->notify();
-  
-  Serial.print("Media key sent: 0x");
-  Serial.println(keyCode, HEX);
-  
-  // Send a release report after a short delay
-  delay(50);
-  uint8_t release[2] = {0x00, 0x00};
-  mediaInput->setValue(release, sizeof(release));
-  mediaInput->notify();
-}
-
-void sendKey(char key, bool pressed) {
-  if (!isConnected) {
-    Serial.println("Not connected to any device");
-    return;
-  }
-
-  uint8_t hidCode = charToHidCode(key);
-  
-  if (pressed) {
-    // Key press report: modifier, reserved, key1, key2, key3, key4, key5, key6
-    uint8_t report[] = {0x00, 0x00, hidCode, 0x00, 0x00, 0x00, 0x00, 0x00};
-    keyboardInput->setValue(report, sizeof(report));
-    keyboardInput->notify();
-    Serial.print("Key pressed: ");
-    Serial.println(key);
-  } else {
-    // Key release report: all zeros except modifier and reserved
-    uint8_t report[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-    keyboardInput->setValue(report, sizeof(report));
-    keyboardInput->notify();
-    Serial.print("Key released: ");
-    Serial.println(key);
-  }
-}
-
-void handleKeypad() {
-  for (int r = 0; r < ROWS; r++) {
-    digitalWrite(rowPins[r], LOW); // Activate the current row
-    delayMicroseconds(10); // Short delay for stability
-    
-    for (int c = 0; c < COLS; c++) {
-      bool currentState = (digitalRead(colPins[c]) == LOW);
-      
-      // Check if the button state has changed
-      if (currentState != lastButtonState[r][c]) {
-        lastDebounceTime[r][c] = millis();
-      }
-      
-      // Apply debouncing
-      if ((millis() - lastDebounceTime[r][c]) > debounceDelay) {
-        // If the button state has changed, update the state
-        if (currentState != buttonState[r][c]) {
-          buttonState[r][c] = currentState;
-          
-          if (buttonState[r][c]) {
-            // Key pressed
-            uint8_t key = keys[r][c];
-            
-            // Check if it's a special media key or a regular key
-            if (key == KEY_PLAY_PAUSE || key == KEY_VOL_UP || key == KEY_VOL_DOWN) {
-              uint16_t mediaCode = specialCodeToMediaCode(key);
-              Serial.print("Media key pressed: ");
-              Serial.println(key);
-              sendMediaKey(mediaCode);
-            } else {
-              Serial.print("Key pressed: ");
-              Serial.println((char)key);
-              sendKey((char)key, true);
-            }
-          } else {
-            // Key released - only send release for regular keys
-            uint8_t key = keys[r][c];
-            if (key != KEY_PLAY_PAUSE && key != KEY_VOL_UP && key != KEY_VOL_DOWN) {
-              Serial.print("Key released: ");
-              Serial.println((char)key);
-              sendKey((char)key, false);
-            }
-          }
-        }
-      }
-      
-      lastButtonState[r][c] = currentState;
-    }
-    
-    digitalWrite(rowPins[r], HIGH); // Deactivate the row
-    delay(1); // Small delay for stability
-  }
-}
-
-void handleEncoder() {
-  encoder.tick();
-  // click_index = (click_index + 1) % RECENT_CLICKS_LEN;
-  int newPos = encoder.getPosition();
-  // recent_clicks[click_index] = newPos;
-
-  if (newPos != oldPos) {
-    if (oldPos > newPos) {
-      Serial.println("Encoder: Volume Up");
-      sendMediaKey(0xE9); // Volume Up
+    if(!touched) {
+        data->state = LV_INDEV_STATE_RELEASED;
     } else {
-      Serial.println("Encoder: Volume Down");
-      sendMediaKey(0xEA); // Volume Down
+        data->state = LV_INDEV_STATE_PRESSED;
+
+        data->point.x = x;
+        data->point.y = y;
     }
-    oldPos = newPos;
-  }
+     */
 }
 
-void setup() {
-  Serial.begin(115200);
-  delay(1000); // Wait for Serial to initialize
-  Serial.println("Starting BLE HID Keypad");
-
-  // Initialize keypad pins
-  for (int r = 0; r < ROWS; r++) {
-    pinMode(rowPins[r], OUTPUT);
-    digitalWrite(rowPins[r], HIGH); // Start with rows inactive
-  }
-  
-  for (int c = 0; c < COLS; c++) {
-    pinMode(colPins[c], INPUT_PULLUP); // Use internal pull-up resistors
-  }
-  
-  // Initialize encoder pins
-  pinMode(ROT_A, INPUT_PULLUP);
-  pinMode(ROT_B, INPUT_PULLUP);
-  encoder.setPosition(0);
-
-  // Initialize BLE device
-  BLEDevice::init("ESP32 HID Keypad");
-
-  // Create BLE server
-  BLEServer *pServer = BLEDevice::createServer();
-  pServer->setCallbacks(new MyServerCallbacks());
-
-  // Create HID device
-  hid = new BLEHIDDevice(pServer);
-  
-  // Set HID report descriptor
-  hid->reportMap((uint8_t*)hidReportDescriptor, sizeof(hidReportDescriptor));
-  
-  // Set manufacturer name
-  hid->manufacturer()->setValue("ESP32 Keypad");
-  
-  // Set HID information
-  hid->pnp(0x02, 0xe502, 0xa111, 0x0210);
-  
-  // Set battery level to 100%
-  // hid->batteryLevel()->setValue(100);
-
-  // Setup input reports
-  keyboardInput = hid->inputReport(1);   // Report ID 1 (Keyboard)
-  mediaInput = hid->inputReport(2);      // Report ID 2 (Media Keys)
-
-  // Start HID services
-  hid->startServices();
-
-  // Setup security
-  BLESecurity *pSecurity = new BLESecurity();
-  pSecurity->setAuthenticationMode(ESP_LE_AUTH_BOND);
-
-  // Start advertising
-  BLEAdvertising *pAdvertising = pServer->getAdvertising();
-  pAdvertising->setAppearance(HID_KEYBOARD);
-  pAdvertising->addServiceUUID(hid->hidService()->getUUID());
-  
-  // Add manufacturer data to help with device recognition
-  BLEAdvertisementData advertisementData;
-  advertisementData.setCompleteServices(BLEUUID(hid->hidService()->getUUID()));
-  advertisementData.setName("ESP32 HID Keypad");
-  pAdvertising->setAdvertisementData(advertisementData);
-  
-  pAdvertising->start();
-  
-  Serial.println("Advertising started. Connect to 'ESP32 HID Keypad'");
+/*use Arduinos millis() as tick source*/
+static uint32_t my_tick(void)
+{
+    return millis();
 }
 
-void loop() {
-  handleEncoder();
-  handleKeypad();
-  delay(10); // Small delay to prevent overwhelming the system
+void setup()
+{
+    String LVGL_Arduino = "Hello Arduino! ";
+    LVGL_Arduino += String('V') + lv_version_major() + "." + lv_version_minor() + "." + lv_version_patch();
+
+    Serial.begin( 115200 );
+    Serial.println( LVGL_Arduino );
+
+    lv_init();
+
+    /*Set a tick source so that LVGL will know how much time elapsed. */
+    lv_tick_set_cb(my_tick);
+
+    /* register print function for debugging */
+#if LV_USE_LOG != 0
+    lv_log_register_print_cb( my_print );
+#endif
+
+    lv_display_t * disp;
+#if LV_USE_TFT_ESPI
+    /*TFT_eSPI can be enabled lv_conf.h to initialize the display in a simple way*/
+    disp = lv_tft_espi_create(TFT_HOR_RES, TFT_VER_RES, draw_buf, sizeof(draw_buf));
+    lv_display_set_rotation(disp, TFT_ROTATION);
+
+#else
+    /*Else create a display yourself*/
+    disp = lv_display_create(TFT_HOR_RES, TFT_VER_RES);
+    lv_display_set_flush_cb(disp, my_disp_flush);
+    lv_display_set_buffers(disp, draw_buf, NULL, sizeof(draw_buf), LV_DISPLAY_RENDER_MODE_PARTIAL);
+#endif
+
+    /*Initialize the (dummy) input device driver*/
+    lv_indev_t * indev = lv_indev_create();
+    lv_indev_set_type(indev, LV_INDEV_TYPE_POINTER); /*Touchpad should have POINTER type*/
+    lv_indev_set_read_cb(indev, my_touchpad_read);
+
+    /* Create a simple label
+     * ---------------------
+     lv_obj_t *label = lv_label_create( lv_screen_active() );
+     lv_label_set_text( label, "Hello Arduino, I'm LVGL!" );
+     lv_obj_align( label, LV_ALIGN_CENTER, 0, 0 );
+
+     * Try an example. See all the examples
+     *  - Online: https://docs.lvgl.io/master/examples.html
+     *  - Source codes: https://github.com/lvgl/lvgl/tree/master/examples
+     * ----------------------------------------------------------------
+
+     lv_example_btn_1();
+
+     * Or try out a demo. Don't forget to enable the demos in lv_conf.h. E.g. LV_USE_DEMO_WIDGETS
+     * -------------------------------------------------------------------------------------------
+
+     lv_demo_widgets();
+     */
+
+    lv_obj_t *label = lv_label_create( lv_screen_active() );
+    lv_label_set_text( label, "Hello Arduino, I'm LVGL!" );
+    lv_obj_align( label, LV_ALIGN_CENTER, 0, 0 );
+
+    Serial.println( "Setup done" );
+}
+
+void loop()
+{
+    lv_timer_handler(); /* let the GUI do its work */
+    delay(5); /* let this time pass */
 }
