@@ -1,131 +1,104 @@
-/*
-|| @file ESP32_BLE_MacroPad_Revised.ino
-|| @version 2.0
-|| @author Combined by Gemini, Debugged by Gemini
-||
-|| @description
-|| | This revised sketch fixes critical bugs and improves performance for a
-|| | BLE MacroPad on macOS.
-|| |
-|| | Key Improvements:
-|| | 1. **Critical Bug Fix:** Moved LED from GPIO1 (Serial TX) to GPIO2 to
-|| |    prevent hardware conflicts.
-|| | 2. **Performance:** Replaced blocking delay() with a non-blocking millis()
-|| |    timer for key debouncing, improving responsiveness.
-|| | 3. **User Feedback:** The main loop now provides clean connection status
-|| |    updates via Serial and visual feedback using the LED (blinking =
-|| |    advertising, solid = connected).
-|| #
-*/
-
-// Include necessary libraries
-// #include <BLEDevice.h>
-// #include <BleKeyboard.h>
-#include <RotaryEncoder.h>
-
-#define LED_PIN 0 // Changed from GPIO1 to GPIO2 to avoid conflict with Serial TX
-
-// --- Bluetooth Keyboard Configuration ---
-// BleKeyboard bleKeyboard("ESP32 MacroPad", "Gemini", 100);
+#include <Arduino.h>
+#include "BLE_HID.h"
+#include "Rotary_Encoder.h"
 
 // --- Keypad Configuration ---
 const byte ROWS = 2;
 const byte COLS = 3;
 
-char keys[ROWS][COLS] = {
-  {'a', 'b', 'c'},
+uint8_t keys[ROWS][COLS] = {
+  {'a', 'b', KEY_PLAY_PAUSE},  // Use codes instead of characters for media keys
   {'d', 'e', 'f'}
 };
 
 // Update these pins to match your ESP32 board's wiring
-byte rowPins[ROWS] = {5, 6};
-byte colPins[COLS] = {4, 7, 8};
+byte rowPins[ROWS] = {5, 1};
+byte colPins[COLS] = {4, 20, 8};
 
-// --- Non-Blocking Debounce Variables ---
-bool prevButtonStates[ROWS][COLS] = {{false}};
+// --- Keypad Debouncing Variables ---
+unsigned long lastDebounceTime[ROWS][COLS] = {0};
+unsigned long debounceDelay = 50;  // 50ms debounce time
+bool lastButtonState[ROWS][COLS] = {{false}};
+bool buttonState[ROWS][COLS] = {{false}};
 
-// --- Rotary Encoder Configuration ---
-#define ROT_A 9
-#define ROT_B 10
-RotaryEncoder encoder(ROT_A, ROT_B, RotaryEncoder::LatchMode::TWO03);
-
-// --- Connection State Variables ---
-bool deviceConnected = false;
 
 void handleKeypad() {
   for (int r = 0; r < ROWS; r++) {
     digitalWrite(rowPins[r], LOW); // Activate the current row
-    delay(5);
-
+    delayMicroseconds(10); // Short delay for stability
+    
     for (int c = 0; c < COLS; c++) {
       bool currentState = (digitalRead(colPins[c]) == LOW);
-
-      if (currentState != prevButtonStates[r][c]) {
-          prevButtonStates[r][c] = currentState; // Update the state
-
-          // Process only on key press (rising edge), not release
-          if (currentState == true) {
-              char key = keys[r][c];
-              digitalWrite(LED_PIN, HIGH); // Turn on LED to indicate key press
-              Serial.print("Key '");
-              Serial.print(key);
-              Serial.println("' pressed.");
-              delay(50);
-              digitalWrite(LED_PIN, LOW); // Turn off LED
-              // bleKeyboard.print(key);
+      
+      // Check if the button state has changed
+      if (currentState != lastButtonState[r][c]) {
+        lastDebounceTime[r][c] = millis();
+      }
+      
+      // Apply debouncing
+      if ((millis() - lastDebounceTime[r][c]) > debounceDelay) {
+        // If the button state has changed, update the state
+        if (currentState != buttonState[r][c]) {
+          buttonState[r][c] = currentState;
+          
+          if (buttonState[r][c]) {
+            // Key pressed
+            uint8_t key = keys[r][c];
+            
+            // Check if it's a special media key or a regular key
+            if (key == KEY_PLAY_PAUSE || key == KEY_VOL_UP || key == KEY_VOL_DOWN) {
+              uint16_t mediaCode = specialCodeToMediaCode(key);
+              Serial.print("Media key pressed: ");
+              Serial.println(key);
+              ble_send_media_key(mediaCode);
+            } else {
+              Serial.print("Key pressed: ");
+              Serial.println((char)key);
+              ble_send_key((char)key, true);
+            }
+          } else {
+            // Key released - only send release for regular keys
+            uint8_t key = keys[r][c];
+            if (key != KEY_PLAY_PAUSE && key != KEY_VOL_UP && key != KEY_VOL_DOWN) {
+              Serial.print("Key released: ");
+              Serial.println((char)key);
+              ble_send_key((char)key, false);
+            }
           }
         }
+      }
+      
+      lastButtonState[r][c] = currentState;
     }
+    
     digitalWrite(rowPins[r], HIGH); // Deactivate the row
+    delay(1); // Small delay for stability
   }
 }
 
-void handleEncoder() {
-  encoder.tick();
-  static int lastPos = 0;
-  int newPos = encoder.getPosition();
 
-  if (newPos != lastPos) {
-    digitalWrite(1, HIGH); // Turn on LED to indicate encoder turn
-    if (newPos > lastPos) {
-      Serial.println("Encoder: Volume Up");
-      // bleKeyboard.write(KEY_MEDIA_VOLUME_UP);
-    } else {
-      Serial.println("Encoder: Volume Down");
-      // bleKeyboard.write(KEY_MEDIA_VOLUME_DOWN);
-    }
-    lastPos = newPos;
-    delay(50);
-    digitalWrite(1, LOW); // Turn off LED
-  }
-}
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("Initializing ESP32 BLE MacroPad (Revised)...");
-
-  pinMode(LED_PIN, OUTPUT);
-  pinMode(1, OUTPUT);
-  digitalWrite(LED_PIN, LOW); // Turn off LED initially
-  digitalWrite(1, LOW);
+  delay(1000); // Wait for Serial to initialize
+  Serial.println("Starting BLE HID Keypad");
 
   // Initialize keypad pins
   for (int r = 0; r < ROWS; r++) {
     pinMode(rowPins[r], OUTPUT);
-    digitalWrite(rowPins[r], HIGH);
+    digitalWrite(rowPins[r], HIGH); // Start with rows inactive
   }
+  
   for (int c = 0; c < COLS; c++) {
-    pinMode(colPins[c], INPUT_PULLUP);
+    pinMode(colPins[c], INPUT_PULLUP); // Use internal pull-up resistors
   }
 
-  // Start the BLE keyboard and set appearance for macOS
-  // bleKeyboard.begin();
-  // BLEDevice::getAdvertising()->setAppearance(0x03C1); // HID keyboard
-  
-  // Serial.println("BLE keyboard started. Waiting for connection...");
+  encoder_setup();
+  ble_hid_setup();
 }
 
 void loop() {
-  handleKeypad();
   handleEncoder();
+  handleKeypad();
+  delay(10); // Small delay to prevent overwhelming the system
 }
