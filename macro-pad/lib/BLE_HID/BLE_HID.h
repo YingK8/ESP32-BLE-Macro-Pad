@@ -3,6 +3,8 @@
 
 #include <Arduino.h>
 
+#define MAX_KEY_COMO_LENGTH 10
+
 // Define keys - use special codes for media keys
 #define KEY_PLAY_PAUSE 0x01
 #define KEY_VOL_UP     0x02
