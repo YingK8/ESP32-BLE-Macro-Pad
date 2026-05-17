@@ -2,16 +2,34 @@
 #define BLE_HID_H
 
 #include <Arduino.h>
+#include <BLEDevice.h>
+#include <BLEUtils.h>
+#include <BLEServer.h>
+#include <BLE2902.h>
+#include <BLEHIDDevice.h>
 
-// Define keys - use special codes for media keys
-#define KEY_PLAY_PAUSE 0x01
-#define KEY_VOL_UP     0x02
-#define KEY_VOL_DOWN   0x03
+// ── Special key codes (values above ASCII range to avoid collisions) ──────────
+static constexpr uint8_t KEY_PLAY_PAUSE = 0xF0;
+static constexpr uint8_t KEY_VOL_UP     = 0xF1;
+static constexpr uint8_t KEY_VOL_DOWN   = 0xF2;
 
-void ble_hid_setup();
-bool ble_is_connected();
-void ble_send_key(char key, bool pressed);
-void ble_send_media_key(uint16_t keyCode);
-uint16_t specialCodeToMediaCode(uint8_t code);
+class BLE_HID {
+public:
+    void begin(const char* deviceName);
+    void sendKey(char key, bool pressed);
+    void sendMediaKey(uint16_t keyCode);
+    bool isConnected() { return _isConnected; }
+    void setConnected(bool state) { _isConnected = state; } // public setter, no friend needed
 
-#endif // BLE_HID_H
+    static uint8_t  charToHidCode(char c);
+    static uint16_t specialCodeToMediaCode(uint8_t code);
+
+private:
+    // BLE HID Objects
+    BLEHIDDevice*      _hid           = nullptr;
+    BLECharacteristic* _keyboardInput = nullptr;
+    BLECharacteristic* _mediaInput    = nullptr;
+    bool               _isConnected   = false;
+};
+
+#endif

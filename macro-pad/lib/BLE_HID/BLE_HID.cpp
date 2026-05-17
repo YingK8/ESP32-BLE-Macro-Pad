@@ -1,15 +1,4 @@
 #include "BLE_HID.h"
-#include <BLEDevice.h>
-#include <BLEUtils.h>
-#include <BLEServer.h>
-#include <BLE2902.h>
-#include <BLEHIDDevice.h>
-
-// BLE HID Objects
-static BLEHIDDevice* hid;
-static BLECharacteristic* keyboardInput;
-static BLECharacteristic* mediaInput;
-bool isConnected = false;
 
 // Combined HID Report Descriptor for Keyboard and Media Keys
 static const uint8_t hidReportDescriptor[] = {
@@ -63,127 +52,103 @@ static const uint8_t hidReportDescriptor[] = {
   0xC0,              // End Collection (Consumer Control)
 };
 
-
-
-// Map characters to HID keycodes
-uint8_t charToHidCode(char c) {
-  switch (c) {
-    case 'a': return 0x04;
-    case 'b': return 0x05;
-    case 'c': return 0x06;
-    case 'd': return 0x07;
-    case 'e': return 0x08;
-    case 'f': return 0x09;
-    default: return 0x00; // No key pressed
-  }
-}
-
-// Map special codes to media keycodes
-uint16_t specialCodeToMediaCode(uint8_t code) {
-  switch (code) {
-    case KEY_PLAY_PAUSE: return 0xCD; // Play/Pause
-    case KEY_VOL_UP:     return 0xE9; // Volume Up
-    case KEY_VOL_DOWN:   return 0xEA; // Volume Down
-    default: return 0x00; // No media key
-  }
-}
+static BLE_HID* _instance = nullptr; // Global pointer to the BLE_HID instance for callbacks
 
 class MyServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
-    isConnected = true;
+    _instance->setConnected(true);
     Serial.println("Device connected");
   }
 
   void onDisconnect(BLEServer* pServer) {
-    isConnected = false;
+    _instance->setConnected(false);
     Serial.println("Device disconnected");
     BLEDevice::startAdvertising();
     Serial.println("Advertising restarted");
   }
 };
 
-void ble_hid_setup() {
-  BLEDevice::init("ESP32 HID Keypad");
-  BLEServer *pServer = BLEDevice::createServer();
-  pServer->setCallbacks(new MyServerCallbacks());
+void BLE_HID::begin(const char* deviceName) {
+    _instance = this;   // point global at this object before callbacks fire
 
-  hid = new BLEHIDDevice(pServer);
-  hid->reportMap((uint8_t*)hidReportDescriptor, sizeof(hidReportDescriptor));
-  hid->manufacturer()->setValue("ESP32 Keypad");
-  hid->pnp(0x02, 0xe502, 0xa111, 0x0210);
+    BLEDevice::init(deviceName);
+    BLEServer* server = BLEDevice::createServer();
+    server->setCallbacks(new ServerCallbacks());
 
-  keyboardInput = hid->inputReport(1);   // Report ID 1 (Keyboard)
-  mediaInput = hid->inputReport(2);      // Report ID 2 (Media Keys)
+    _hid = new BLEHIDDevice(server);
+    _hid->manufacturer()->setValue("ESP32");
+    _hid->pnp(0x02, 0xe502, 0xa111, 0x0210);
+    _hid->hidInfo(0x00, 0x01);
+    _hid->reportMap((uint8_t*)hidReportDescriptor, sizeof(hidReportDescriptor));
 
-  hid->startServices();
+    _keyboardInput = _hid->inputReport(1);
+    _mediaInput    = _hid->inputReport(2);
 
-  BLESecurity *pSecurity = new BLESecurity();
-  pSecurity->setAuthenticationMode(ESP_LE_AUTH_BOND);
+    _hid->startServices();
 
-  BLEAdvertising *pAdvertising = pServer->getAdvertising();
-  pAdvertising->setAppearance(HID_KEYBOARD);
-  pAdvertising->addServiceUUID(hid->hidService()->getUUID());
+    BLEAdvertising* adv = server->getAdvertising();
+    adv->setAppearance(HID_KEYBOARD);
+    adv->addServiceUUID(_hid->hidService()->getUUID());
+    adv->start();
 
-  // Add manufacturer data to help with device recognition
-  BLEAdvertisementData advertisementData;
-  advertisementData.setCompleteServices(BLEUUID(hid->hidService()->getUUID()));
-  advertisementData.setName("ESP32 HID Keypad");
-  pAdvertising->setAdvertisementData(advertisementData);
-  
-  pAdvertising->start();
-
-  Serial.println("Advertising started. Connect to 'ESP32 HID Keypad'");
+    Serial.print("Advertising as: ");
+    Serial.println(deviceName);
 }
 
-bool ble_is_connected() {
-  return isConnected;
+// Map characters to HID keycodes
+uint8_t BLE_HID::charToHidCode(char c) {
+    switch (c) {
+        case 'a': return 0x04;
+        case 'b': return 0x05;
+        case 'c': return 0x06;
+        case 'd': return 0x07;
+        case 'e': return 0x08;
+        case 'f': return 0x09;
+        default: return 0x00; // No key pressed
+    }
 }
 
-void ble_send_key(char key, bool pressed) {
-  if (!isConnected) {
-    Serial.println("Not connected to any device");
-    return;
-  }
-
-  uint8_t hidCode = charToHidCode(key);
-  
-  if (pressed) {
-    // Key press report: modifier, reserved, key1, key2, key3, key4, key5, key6
-    uint8_t report[] = {0x00, 0x00, hidCode, 0x00, 0x00, 0x00, 0x00, 0x00};
-    keyboardInput->setValue(report, sizeof(report));
-    keyboardInput->notify();
-    Serial.print("Key pressed: ");
-    Serial.println(key);
-  } else {
-    // Key release report: all zeros except modifier and reserved
-    uint8_t report[] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-    keyboardInput->setValue(report, sizeof(report));
-    keyboardInput->notify();
-    Serial.print("Key released: ");
-    Serial.println(key);
-  }
+// Map special codes to media keycodes
+uint16_t specialCodeToMediaCode(uint8_t code) {
+    switch (code) {
+        case KEY_PLAY_PAUSE: return 0xCD; // Play/Pause
+        case KEY_VOL_UP:     return 0xE9; // Volume Up
+        case KEY_VOL_DOWN:   return 0xEA; // Volume Down
+        default: return 0x00; // No media key
+    }
 }
 
-void ble_send_media_key(uint16_t keyCode) {
-  if (!isConnected) return;
-  if (!isConnected) {
-    Serial.println("Not connected to any device");
-    return;
-  }
+void BLE_HID::sendKey(char key, bool pressed) {
+    if (!_isConnected) return;
 
-  // Convert the 16-bit key code to bytes (little-endian)
-  uint8_t report[2] = {static_cast<uint8_t>(keyCode & 0xFF), static_cast<uint8_t>((keyCode >> 8) & 0xFF)};
-  mediaInput->setValue(report, sizeof(report));
-  mediaInput->notify();
-  
-  Serial.print("Media key sent: 0x");
-  Serial.println(keyCode, HEX);
-  
-  // Send a release report after a short delay
-  delay(50);
-  uint8_t release[2] = {0x00, 0x00};
-  mediaInput->setValue(release, sizeof(release));
-  mediaInput->notify();
+    uint8_t hidCode = charToHidCode(key);
+
+    if (pressed) {
+        uint8_t report[] = { 0x00, 0x00, hidCode, 0x00, 0x00, 0x00, 0x00, 0x00 };
+        _keyboardInput->setValue(report, sizeof(report));
+    } else {
+        uint8_t report[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+        _keyboardInput->setValue(report, sizeof(report));
+    }
+    _keyboardInput->notify();
 }
+
+void BLE_HID::sendMediaKey(uint16_t keyCode) {
+    if (!_isConnected) return;
+
+    uint8_t report[2] = {
+        static_cast<uint8_t>(keyCode & 0xFF),
+        static_cast<uint8_t>((keyCode >> 8) & 0xFF)
+    };
+    _mediaInput->setValue(report, sizeof(report));
+    _mediaInput->notify();
+
+    delay(50);
+
+    uint8_t release[2] = { 0x00, 0x00 };
+    _mediaInput->setValue(release, sizeof(release));
+    _mediaInput->notify();
+}
+
 
 

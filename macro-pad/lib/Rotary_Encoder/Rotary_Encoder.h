@@ -1,10 +1,20 @@
-#ifndef ROTARY_ENCODER_H
-#define ROTARY_ENCODER_H
+#ifndef ENCODER_H
+#define ENCODER_H
 
 #include <Arduino.h>
+#include <RotaryEncoder.h>
+#include "BLE_HID.h"
 
-// --- Rotary Encoder Configuration ---
-void encoder_setup();
-void handleEncoder();
+class Encoder {
+public:
+    Encoder(BLE_HID& ble, uint8_t pinA, uint8_t pinB);
+    void begin();
+    void handle();
 
-#endif // ROTARY_ENCODER_H
+private:
+    BLE_HID& _ble;
+    RotaryEncoder _encoder;
+    int _oldPos;
+};
+
+#endif
