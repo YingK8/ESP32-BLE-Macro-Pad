@@ -62,3 +62,15 @@ const uint8_t keys[ROWS][COLS] = {
   {MEDIA_PLAY, MEDIA_VOL_UP, MEDIA_VOL_DOWN},
   {KEY_F13, KEY_F14, KEY_F15}
 };
+
+## Pomodoro UI + Task Sync (macro-pad/)
+
+- Display: ST7789 240x280 SPI. Set pins in `macro-pad/include/Config.h`.
+- Controls: top-left key toggles pause/resume; encoder rotation moves selection; top-right key (encoder click in matrix) checks/unchecks a task.
+- Task payload: newline-delimited titles terminated by `--END--`.
+
+CLI helper (requires `pip install bleak`):
+
+```bash
+python3 macro-pad/tools/push_tasks.py "Write report" "Review PRs"
+```

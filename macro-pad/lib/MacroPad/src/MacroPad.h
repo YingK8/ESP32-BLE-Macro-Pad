@@ -7,6 +7,7 @@
 static constexpr uint8_t MAX_ROWS = 8;
 static constexpr uint8_t MAX_COLS = 8;
 class MacroPad; // Forward declaration for server callbacks
+using KeyEventHandler = bool (*)(uint8_t index, uint8_t key, bool pressed);
 
 class MacroPadServerCallbacks : public BLEServerCallbacks {
 public:
@@ -31,6 +32,7 @@ public:
 
     void begin();
     void handleKeypad();
+    void setKeyHandler(KeyEventHandler handler) { _handler = handler; }
     void sendKey(char key, bool pressed);
     void sendMediaKey(uint16_t keyCode);
     bool connected() const { return _isConnected; }
@@ -51,6 +53,7 @@ private:
     bool          _buttonState[MAX_ROWS * MAX_COLS];
     bool          _lastButtonState[MAX_ROWS * MAX_COLS];
     unsigned long _lastDebounceTime[MAX_ROWS * MAX_COLS];
+    KeyEventHandler _handler = nullptr;
 
     // BLE
     BLEHIDDevice*      _hid           = nullptr;

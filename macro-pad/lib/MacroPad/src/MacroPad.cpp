@@ -38,7 +38,7 @@ void MacroPad::begin() {
     }
 }
 
-void MacroPad::handle() {
+void MacroPad::handleKeypad() {
     for (uint8_t r = 0; r < _rows; r++) {
         digitalWrite(_rowPins[r], LOW);
         delayMicroseconds(10);
@@ -51,7 +51,7 @@ void MacroPad::handle() {
                 _lastDebounceTime[i] = millis();
             }
 
-            if ((millis() - _lastDebounceTime[i]) > DEBOUNCE_MS) {
+            if ((millis() - _lastDebounceTime[i]) > DEBOUNCE_DELAY_MS) {
                 if (current != _buttonState[i]) {
                     _buttonState[i] = current;
                     uint8_t key = _keys[i];
@@ -59,14 +59,17 @@ void MacroPad::handle() {
                                     key == KEY_VOL_UP     ||
                                     key == KEY_VOL_DOWN);
 
-                    if (current) {
-                        if (isMedia) {
-                            _ble.sendMediaKey(BLE_HID::specialCodeToMediaCode(key));
-                        } else {
-                            _ble.sendKey((char)key, true);
+                    bool consumed = _handler ? _handler(i, key, current) : false;
+                    if (!consumed) {
+                        if (current) {
+                            if (isMedia) {
+                                _ble.sendMediaKey(BLE_HID::specialCodeToMediaCode(key));
+                            } else {
+                                _ble.sendKey((char)key, true);
+                            }
+                        } else if (!isMedia) {
+                            _ble.sendKey((char)key, false);
                         }
-                    } else if (!isMedia) {
-                        _ble.sendKey((char)key, false);
                     }
                 }
             }

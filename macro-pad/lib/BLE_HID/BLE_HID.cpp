@@ -54,7 +54,7 @@ static const uint8_t hidReportDescriptor[] = {
 
 static BLE_HID* _instance = nullptr; // Global pointer to the BLE_HID instance for callbacks
 
-class MyServerCallbacks : public BLEServerCallbacks {
+class ServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
     _instance->setConnected(true);
     Serial.println("Device connected");
@@ -74,6 +74,7 @@ void BLE_HID::begin(const char* deviceName) {
     BLEDevice::init(deviceName);
     BLEServer* server = BLEDevice::createServer();
     server->setCallbacks(new ServerCallbacks());
+    _server = server;
 
     _hid = new BLEHIDDevice(server);
     _hid->manufacturer()->setValue("ESP32");
@@ -87,6 +88,7 @@ void BLE_HID::begin(const char* deviceName) {
     _hid->startServices();
 
     BLEAdvertising* adv = server->getAdvertising();
+    _advertising = adv;
     adv->setAppearance(HID_KEYBOARD);
     adv->addServiceUUID(_hid->hidService()->getUUID());
     adv->start();
@@ -109,7 +111,7 @@ uint8_t BLE_HID::charToHidCode(char c) {
 }
 
 // Map special codes to media keycodes
-uint16_t specialCodeToMediaCode(uint8_t code) {
+uint16_t BLE_HID::specialCodeToMediaCode(uint8_t code) {
     switch (code) {
         case KEY_PLAY_PAUSE: return 0xCD; // Play/Pause
         case KEY_VOL_UP:     return 0xE9; // Volume Up
@@ -149,6 +151,5 @@ void BLE_HID::sendMediaKey(uint16_t keyCode) {
     _mediaInput->setValue(release, sizeof(release));
     _mediaInput->notify();
 }
-
 
 

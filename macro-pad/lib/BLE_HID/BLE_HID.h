@@ -20,6 +20,8 @@ public:
     void sendMediaKey(uint16_t keyCode);
     bool isConnected() { return _isConnected; }
     void setConnected(bool state) { _isConnected = state; } // public setter, no friend needed
+    BLEServer* server() const { return _server; }
+    BLEAdvertising* advertising() const { return _advertising; }
 
     static uint8_t  charToHidCode(char c);
     static uint16_t specialCodeToMediaCode(uint8_t code);
@@ -30,6 +32,8 @@ private:
     BLECharacteristic* _keyboardInput = nullptr;
     BLECharacteristic* _mediaInput    = nullptr;
     bool               _isConnected   = false;
+    BLEServer*         _server        = nullptr;
+    BLEAdvertising*    _advertising   = nullptr;
 };
 
 #endif
