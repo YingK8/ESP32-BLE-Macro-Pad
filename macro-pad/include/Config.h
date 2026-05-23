@@ -3,35 +3,51 @@
 
 #include <Arduino.h>
 
-// Keypad matrix
+// Keypad matrix (2R × 3C)
 static constexpr uint8_t ROWS = 2;
 static constexpr uint8_t COLS = 3;
-static constexpr uint8_t ROW_PINS[ROWS] = {1, 5};             // Row 0 -> 1, Row 1 -> 5
-static constexpr uint8_t COL_PINS[COLS] = {4, 20, 8};          // Col 0 -> 4, Col 1 -> 20 (RX), Col 2 -> 8
-static constexpr uint8_t PAUSE_KEY_INDEX = 0;                 // top-left key (row 0, col 0)
-static constexpr uint8_t ENCODER_CLICK_INDEX = 2;             // top-right key (row 0, col 2)
+// Defined once in Config.cpp — avoids duplicate copies in every translation unit.
+extern const uint8_t ROW_PINS[ROWS];  // {1, 5}
+extern const uint8_t COL_PINS[COLS];  // {4, 20, 8}
+static constexpr uint8_t PAUSE_KEY_INDEX     = 0;
+static constexpr uint8_t SKIP_KEY_INDEX      = 1;
+static constexpr uint8_t NEXT_KEY_INDEX      = 2;  // top-right key: advance task queue
+static constexpr uint8_t ENCODER_CLICK_INDEX = 5;
 
 // Encoder
-static constexpr uint8_t PIN_ENCODER_A = 3;                   // Moved from 9 (Safe from boot restrictions)
-static constexpr uint8_t PIN_ENCODER_B = 10;                  // Moved from 21 (Safe from boot restrictions)
-static constexpr int PIN_ENCODER_BUTTON = -1;                 // click is wired into the matrix
+static constexpr uint8_t PIN_ENCODER_A = 3;
+static constexpr uint8_t PIN_ENCODER_B = 10;
 
-// Display (ST7789 240x280, SPI)
-static constexpr int PIN_TFT_SCK = 7;                          // SCL Pin
-static constexpr int PIN_TFT_MOSI = 6;                         // SDA Pin
-static constexpr int PIN_TFT_MISO = -1;                        // Unused (Screen is write-only)
-static constexpr int PIN_TFT_DC = 2;                           // D/C Pin
-static constexpr int PIN_TFT_CS = 0;                           // CS Pin
-static constexpr int PIN_TFT_RST = 9;                          // RESET Pin (Safe strapping location)
-static constexpr int PIN_TFT_BL = 21;                          // Backlight (TX Pin)
+// Display — ST7789 240×280, 4-wire SPI
+static constexpr int PIN_TFT_SCK  = 7;
+static constexpr int PIN_TFT_MOSI = 6;
+static constexpr int PIN_TFT_MISO = -1;
+static constexpr int PIN_TFT_DC   = 2;
+static constexpr int PIN_TFT_CS   = 0;
+static constexpr int PIN_TFT_RST  = 9;
+static constexpr int PIN_TFT_BL   = 21;
 
-static constexpr int TFT_WIDTH = 240;
-static constexpr int TFT_HEIGHT = 280;
-static constexpr int TFT_ROTATION = 0;
+// Logical (post-rotation) dimensions; physical panel is portrait 240×280.
+static constexpr int TFT_WIDTH    = 280;
+static constexpr int TFT_HEIGHT   = 240;
+static constexpr int TFT_ROTATION = 1;
 static constexpr int TFT_OFFSET_X = 0;
-static constexpr int TFT_OFFSET_Y = 0;
+static constexpr int TFT_OFFSET_Y = 20;
+
+// UI grid padding
+static constexpr int UI_PADDING     = 20;
+static constexpr int UI_PADDING_TOP = 30;
+
+// Pomodoro
+struct Phase { const char* label; uint16_t minutes; bool bigDot; };
+
+// PHASE_COUNT must match the array in Config.cpp.
+static constexpr size_t PHASE_COUNT      = 8;
+static constexpr size_t LONG_BREAK_PHASE = PHASE_COUNT - 1;
+extern const Phase PHASES[PHASE_COUNT];
 
 // Tasks
-static constexpr size_t MAX_TASKS = 12;
+static constexpr size_t MAX_TASKS    = 12;
+static constexpr size_t TASK_MAX_LEN = 32;  // max chars per stored task name (incl. null)
 
 #endif
