@@ -11,9 +11,9 @@
 
 BLE_HID ble;
 
-static uint8_t keymap[ROWS * COLS] = {
-    0x00,      0x00,     0x00,
-    KEY_PAUSE, KEY_NEXT, KEY_PLAY_PAUSE  // bottom row: pause timer, next task, play/pause media
+static Key keymap[ROWS * COLS] = {
+    Key::none(),              Key::none(),             Key::none(),
+    Key::app(AppKey::PAUSE),  Key::app(AppKey::NEXT),  Key::media(MediaKey::PLAY_PAUSE)
 };
 
 MacroPad keypad(ble, keymap, ROWS, COLS, ROW_PINS, COL_PINS);
@@ -89,8 +89,10 @@ static void handleTimer() {
 }
 
 // returns true if the key was handled here (prevents MacroPad from forwarding it over BLE)
-static bool handleKeyEvent(uint8_t key, bool pressed) {
-    if (key == KEY_PAUSE && pressed) {
+static bool handleKeyEvent(const Key& key, bool pressed) {
+    if (key.type != KeyType::APP) return false;
+
+    if (key._app == AppKey::PAUSE && pressed) {
         if (waitingForContinue) {
             bool wasRest       = !isWorkPhase(currentPhase);
             waitingForContinue = false;
@@ -108,7 +110,7 @@ static bool handleKeyEvent(uint8_t key, bool pressed) {
         return true;
     }
 
-    if (key == KEY_NEXT && pressed && taskCount > 0 && taskOffset < taskCount - 1) {
+    if (key._app == AppKey::NEXT && pressed && taskCount > 0 && taskOffset < taskCount - 1) {
         taskOffset++;
         taskSelected = 0;
         tasksDirty   = true;
@@ -136,8 +138,8 @@ void loop() {
 
     encoder.handle();
     int delta = encoder.consumeDelta();
-    while (delta > 0) { ble.sendMediaKey(BLE_HID::specialCodeToMediaCode(KEY_VOL_UP));   delta--; }
-    while (delta < 0) { ble.sendMediaKey(BLE_HID::specialCodeToMediaCode(KEY_VOL_DOWN)); delta++; }
+    while (delta < 0) { ble.sendMediaKey(MediaKey::VOL_UP);   delta--; }
+    while (delta > 0) { ble.sendMediaKey(MediaKey::VOL_DOWN); delta++; }
 
     handleTimer();
 

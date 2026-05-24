@@ -8,26 +8,26 @@
 #include <BLE2902.h>
 #include <BLEHIDDevice.h>
 
-// ── Special key codes (values above ASCII range to avoid collisions) ──────────
-static constexpr uint8_t KEY_PLAY_PAUSE = 0xF0;
-static constexpr uint8_t KEY_VOL_UP     = 0xF1;
-static constexpr uint8_t KEY_VOL_DOWN   = 0xF2;
+// HID Consumer Page codes — used directly in Key::media(), no lookup needed
+namespace MediaKey {
+    static constexpr uint16_t PLAY_PAUSE = 0x00CD;
+    static constexpr uint16_t VOL_UP     = 0x00E9;
+    static constexpr uint16_t VOL_DOWN   = 0x00EA;
+}
 
 class BLE_HID {
 public:
     void begin(const char* deviceName);
     void sendKey(char key, bool pressed);
-    void sendMediaKey(uint16_t keyCode);
+    void sendMediaKey(uint16_t keyCode);  // pass a MediaKey:: constant directly
     bool isConnected() { return _isConnected; }
-    void setConnected(bool state) { _isConnected = state; } // public setter, no friend needed
+    void setConnected(bool state) { _isConnected = state; }
     BLEServer* server() const { return _server; }
     BLEAdvertising* advertising() const { return _advertising; }
 
-    static uint8_t  charToHidCode(char c);
-    static uint16_t specialCodeToMediaCode(uint8_t code);
+    static uint8_t charToHidCode(char c);  // maps printable ASCII to USB HID key codes
 
 private:
-    // BLE HID Objects
     BLEHIDDevice*      _hid           = nullptr;
     BLECharacteristic* _keyboardInput = nullptr;
     BLECharacteristic* _mediaInput    = nullptr;

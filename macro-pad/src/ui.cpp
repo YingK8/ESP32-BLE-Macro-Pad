@@ -1,9 +1,9 @@
 #include "ui.h"
 #include <lvgl.h>
 
-#define TIMER_H      100  // px: height of the timer band at the top
-#define TASK_Y_OFFS   0  // px: gap between timer band and first task row
-#define TASK_ROW_H    38  // px: height per task row (= monogram_lower_40 line height)
+#define TIMER_H      100  // px: timer band height
+#define TASK_Y_OFFS    0  // px: gap between timer band and first task row
+#define TASK_ROW_H    38  // px: one task row; matches monogram_lower_40 line height
 #define TASK_ROWS      5
 
 extern const lv_font_t monogram_lower_counter_125;
@@ -41,7 +41,7 @@ void createUI(void) {
     lv_obj_set_style_text_color(timerLabel, lv_color_hex(0xFFFFFF), 0);
     lv_obj_set_width(timerLabel, TFT_WIDTH);
     lv_obj_set_style_text_align(timerLabel, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_set_pos(timerLabel, 0, (TIMER_H - 72) / 2);
+    lv_obj_set_pos(timerLabel, 0, (TIMER_H - 72) / 2);  // center 72px glyph in 100px band
     lv_label_set_text(timerLabel, "00:00");
 
     // --- Highlight bar — drawn before labels so labels render on top ---
@@ -58,7 +58,7 @@ void createUI(void) {
         taskLabels[i] = lv_label_create(scr);
         lv_obj_set_style_text_font(taskLabels[i], &monogram_lower_40, 0);
         lv_obj_set_style_text_color(taskLabels[i], lv_color_hex(0xFFFFFF), 0);
-        lv_obj_set_pos(taskLabels[i], UI_PADDING, rowY(i) + (TASK_ROW_H - 18) / 2);  // 18 = line_height
+        lv_obj_set_pos(taskLabels[i], UI_PADDING, rowY(i) + (TASK_ROW_H - 18) / 2);  // center 18px glyph in 38px row
         lv_label_set_text(taskLabels[i], "");
         lv_obj_add_flag(taskLabels[i], LV_OBJ_FLAG_HIDDEN);
     }

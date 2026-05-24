@@ -2,7 +2,7 @@
 
 MacroPad::MacroPad(
     BLE_HID&       ble,
-    const uint8_t* keymap,
+    const Key*     keymap,
     uint8_t        rows,
     uint8_t        cols,
     const uint8_t* rowPins,
@@ -54,21 +54,30 @@ void MacroPad::handleKeypad() {
             if ((millis() - _lastDebounceTime[i]) > DEBOUNCE_DELAY_MS) {
                 if (current != _buttonState[i]) {
                     _buttonState[i] = current;
-                    uint8_t key = _keys[i];
-                    bool isMedia = (key == KEY_PLAY_PAUSE ||
-                                    key == KEY_VOL_UP     ||
-                                    key == KEY_VOL_DOWN);
+                    const Key& key = _keys[i];
 
                     bool consumed = _handler ? _handler(key, current) : false;
                     if (!consumed) {
                         if (current) {
-                            if (isMedia) {
-                                _ble.sendMediaKey(BLE_HID::specialCodeToMediaCode(key));
-                            } else {
-                                _ble.sendKey((char)key, true);
+                            switch (key.type) {
+                                case KeyType::CHAR:
+                                    _ble.sendKey(key._ch, true);
+                                    break;
+                                case KeyType::MEDIA:
+                                    _ble.sendMediaKey(key._media);
+                                    break;
+                                case KeyType::STRING:
+                                    // type each character as a press+release pair
+                                    for (const char* p = key._str; *p; p++) {
+                                        _ble.sendKey(*p, true);
+                                        _ble.sendKey(*p, false);
+                                    }
+                                    break;
+                                default:
+                                    break;
                             }
-                        } else if (!isMedia) {
-                            _ble.sendKey((char)key, false);
+                        } else if (key.type == KeyType::CHAR) {
+                            _ble.sendKey(key._ch, false);  // key-up for held chars
                         }
                     }
                 }
