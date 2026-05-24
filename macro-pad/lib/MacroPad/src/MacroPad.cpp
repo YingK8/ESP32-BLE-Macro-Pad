@@ -59,7 +59,7 @@ void MacroPad::handleKeypad() {
                                     key == KEY_VOL_UP     ||
                                     key == KEY_VOL_DOWN);
 
-                    bool consumed = _handler ? _handler(i, key, current) : false;
+                    bool consumed = _handler ? _handler(key, current) : false;
                     if (!consumed) {
                         if (current) {
                             if (isMedia) {

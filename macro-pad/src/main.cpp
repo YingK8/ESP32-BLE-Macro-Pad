@@ -9,11 +9,12 @@
 #include "TaskSync.h"
 #include "ui.h"
 
-// ----- BLE + input devices -----
 BLE_HID ble;
 
-// Key 0=pause/continue, 1=skip, 2=next. Keys 3-5 passed through as HID.
-static uint8_t keymap[ROWS * COLS] = { 0x00, 0x00, 0x00, 'd', 'e', 0xF0 };  // 0xF0 = KEY_PLAY_PAUSE
+static uint8_t keymap[ROWS * COLS] = {
+    0x00,      0x00,     0x00,
+    KEY_PAUSE, KEY_NEXT, KEY_PLAY_PAUSE  // bottom row: pause timer, next task, play/pause media
+};
 
 MacroPad keypad(ble, keymap, ROWS, COLS, ROW_PINS, COL_PINS);
 Encoder  encoder(ble, PIN_ENCODER_A, PIN_ENCODER_B);
@@ -22,7 +23,7 @@ Encoder  encoder(ble, PIN_ENCODER_A, PIN_ENCODER_B);
 static size_t        currentPhase       = 0;
 static int           remainingSeconds   = PHASES[0].minutes * 60;
 static bool          timerRunning       = false;
-static bool          waitingForContinue = false;  // true when phase ended, awaiting key press
+static bool          waitingForContinue = false;  // phase ended, waiting for key to advance
 static unsigned long lastSecondTick     = 0;
 
 // ----- Tasks -----
@@ -30,18 +31,18 @@ static char   tasks[MAX_TASKS][TASK_MAX_LEN] = {
     "grasp map", "test", "orca handoff", "joint map*", "teleop"
 };
 static size_t taskCount    = 5;
-static size_t taskOffset   = 0;  // index of the top-visible task in the 5-row queue
-static int    taskSelected = 0;  // 0–4: which visible row is highlighted
+static size_t taskOffset   = 0;  // first visible task in the queue
+static size_t taskSelected = 0;  // highlighted row (0 = top)
 
-static bool timerDirty = true;
-static bool tasksDirty = true;
+static bool timerDirty = true;  // UI needs a timer redraw
+static bool tasksDirty = true;  // UI needs a task list redraw
 
-// WORK phases = black screen + task list; REST/LONG REST = white screen, no tasks.
+// work phases show the task list; rest phases show a blank screen
 static bool isWorkPhase(size_t idx) {
     return strcmp(PHASES[idx].label, "work") == 0;
 }
 
-// ----- Task parsing -----
+// parse newline-separated task names from a BLE payload, lowercase them for the font
 static void applyTasks(const char* payload) {
     taskCount = 0;
     const char* p = payload;
@@ -53,7 +54,6 @@ static void applyTasks(const char* payload) {
             size_t n = len < TASK_MAX_LEN - 1 ? len : TASK_MAX_LEN - 1;
             memcpy(tasks[taskCount], p, n);
             tasks[taskCount][n] = '\0';
-            // Lowercase-convert: monogram_lower_32 has no uppercase glyphs
             for (char* q = tasks[taskCount]; *q; q++)
                 if (*q >= 'A' && *q <= 'Z') *q += 32;
             taskCount++;
@@ -65,85 +65,59 @@ static void applyTasks(const char* payload) {
     tasksDirty   = true;
 }
 
-// ----- Pomodoro control -----
+// move to next pomodoro phase and reset the countdown
 static void advancePhase() {
-    currentPhase = (currentPhase + 1) % PHASE_COUNT;
+    currentPhase     = (currentPhase + 1) % PHASE_COUNT;
     remainingSeconds = PHASES[currentPhase].minutes * 60;
     timerDirty = true;
-    tasksDirty = true;  // work↔rest switch changes task list visibility
+    tasksDirty = true;
 }
 
-static void skipPhase() {
-    waitingForContinue = false;
-    advancePhase();
-    lastSecondTick = 0;  // give the new phase its full first second
-}
-
-static void togglePause() { timerRunning = !timerRunning; timerDirty = true; }
-
+// count down one second per wall-clock second; stop and wait when time runs out
 static void handleTimer() {
     if (!timerRunning) return;
     unsigned long now = millis();
-    if (lastSecondTick == 0) { lastSecondTick = now; return; }
+    if (lastSecondTick == 0) { lastSecondTick = now; return; }  // first call: anchor the clock
     if (now - lastSecondTick >= 1000) {
         lastSecondTick += 1000;
         if (remainingSeconds > 0) { remainingSeconds--; timerDirty = true; }
         if (remainingSeconds == 0) {
-            timerRunning = false;
+            timerRunning       = false;
             waitingForContinue = true;
-            // advancePhase() is deferred until the user presses the pause key
         }
     }
 }
 
-// ----- Input handling -----
-static bool handleKeyEvent(uint8_t index, uint8_t, bool pressed) {
-    if (index == PAUSE_KEY_INDEX) {
-        if (pressed) {
-            if (waitingForContinue) {
-                bool wasRest = !isWorkPhase(currentPhase);
-                waitingForContinue = false;
-                advancePhase();
-                // After a rest phase, advance the task queue so the next task is on top
-                if (wasRest && taskCount > 1 && taskOffset < taskCount - 1) {
-                    taskOffset++;
-                    taskSelected = 0;
-                }
-                lastSecondTick = 0;
-                timerRunning   = true;
-            } else {
-                togglePause();
+// returns true if the key was handled here (prevents MacroPad from forwarding it over BLE)
+static bool handleKeyEvent(uint8_t key, bool pressed) {
+    if (key == KEY_PAUSE && pressed) {
+        if (waitingForContinue) {
+            bool wasRest       = !isWorkPhase(currentPhase);
+            waitingForContinue = false;
+            advancePhase();
+            if (wasRest && taskCount > 1 && taskOffset < taskCount - 1) {
+                taskOffset++;    // after a rest, surface the next task automatically
+                taskSelected = 0;
             }
+            lastSecondTick = 0;
+            timerRunning   = true;
+        } else {
+            timerRunning = !timerRunning;
+            timerDirty   = true;
         }
         return true;
     }
 
-    if (index == SKIP_KEY_INDEX) {
-        if (pressed) {
-            bool wasWaiting = waitingForContinue;
-            skipPhase();
-            if (wasWaiting) timerRunning = true;  // auto-start when skipping a finished phase
-        }
-        return true;
-    }
-
-    if (index == NEXT_KEY_INDEX) {
-        if (pressed && taskCount > 0 && taskOffset < taskCount - 1) {
-            taskOffset++;
-            taskSelected = 0;
-            tasksDirty   = true;
-        }
+    if (key == KEY_NEXT && pressed && taskCount > 0 && taskOffset < taskCount - 1) {
+        taskOffset++;
+        taskSelected = 0;
+        tasksDirty   = true;
         return true;
     }
 
     return false;
 }
 
-static void handleEncoder() {
-    encoder.handle();  // sends BLE HID volume up/down; button handled by keymap
-}
-
-// ----- Arduino entry points -----
 void setup() {
     Serial.begin(115200);
     ble.begin("ESP32 MacroPad");
@@ -154,12 +128,17 @@ void setup() {
     setupDisplay();
     createUI();
     updateTimer(remainingSeconds, isWorkPhase(currentPhase), waitingForContinue);
-    updateTaskQueue(tasks, taskCount, taskOffset, (size_t)taskSelected);
+    updateTaskQueue(tasks, taskCount, taskOffset, taskSelected);
 }
 
 void loop() {
     keypad.handleKeypad();
-    handleEncoder();
+
+    encoder.handle();
+    int delta = encoder.consumeDelta();
+    while (delta > 0) { ble.sendMediaKey(BLE_HID::specialCodeToMediaCode(KEY_VOL_UP));   delta--; }
+    while (delta < 0) { ble.sendMediaKey(BLE_HID::specialCodeToMediaCode(KEY_VOL_DOWN)); delta++; }
+
     handleTimer();
 
     static char payload[MAX_TASKS * TASK_MAX_LEN + 32];
@@ -170,10 +149,11 @@ void loop() {
         timerDirty = false;
     }
     if (tasksDirty) {
-        updateTaskQueue(tasks, taskCount, taskOffset, (size_t)taskSelected);
+        updateTaskQueue(tasks, taskCount, taskOffset, taskSelected);
         tasksDirty = false;
     }
 
+    // feed LVGL the elapsed time so its animations and timers run correctly
     static unsigned long lastTick = 0;
     unsigned long now = millis();
     if (lastTick == 0) lastTick = now;

@@ -2,12 +2,12 @@
 #include <lvgl.h>
 
 #define TIMER_H      100  // px: height of the timer band at the top
-#define TASK_Y_OFFS   16  // px: gap between timer band and first task row
-#define TASK_ROW_H    28  // px: height per task row (= monogram_lower_32 line height)
+#define TASK_Y_OFFS   0  // px: gap between timer band and first task row
+#define TASK_ROW_H    38  // px: height per task row (= monogram_lower_40 line height)
 #define TASK_ROWS      5
 
-extern const lv_font_t monogram_lower_numbers_72;
-extern const lv_font_t monogram_lower_32;
+extern const lv_font_t monogram_lower_counter_125;
+extern const lv_font_t monogram_lower_40;
 
 static lv_obj_t* timerLabel           = nullptr;
 static lv_obj_t* highlightBar         = nullptr;  // white strip drawn behind selected row
@@ -37,7 +37,7 @@ void createUI(void) {
 
     // --- Timer label (directly on screen, horizontally centered) ---
     timerLabel = lv_label_create(scr);
-    lv_obj_set_style_text_font(timerLabel, &monogram_lower_numbers_72, 0);
+    lv_obj_set_style_text_font(timerLabel, &monogram_lower_counter_125, 0);
     lv_obj_set_style_text_color(timerLabel, lv_color_hex(0xFFFFFF), 0);
     lv_obj_set_width(timerLabel, TFT_WIDTH);
     lv_obj_set_style_text_align(timerLabel, LV_TEXT_ALIGN_CENTER, 0);
@@ -56,7 +56,7 @@ void createUI(void) {
     // --- Task labels (directly on screen, no container parent) ---
     for (int i = 0; i < TASK_ROWS; i++) {
         taskLabels[i] = lv_label_create(scr);
-        lv_obj_set_style_text_font(taskLabels[i], &monogram_lower_32, 0);
+        lv_obj_set_style_text_font(taskLabels[i], &monogram_lower_40, 0);
         lv_obj_set_style_text_color(taskLabels[i], lv_color_hex(0xFFFFFF), 0);
         lv_obj_set_pos(taskLabels[i], UI_PADDING, rowY(i) + (TASK_ROW_H - 18) / 2);  // 18 = line_height
         lv_label_set_text(taskLabels[i], "");

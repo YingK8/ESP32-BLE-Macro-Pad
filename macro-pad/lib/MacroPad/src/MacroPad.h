@@ -4,10 +4,15 @@
 #include <Arduino.h>
 #include "BLE_HID.h"
 
+// Logical key indices — match the flat keymap[] array in main.cpp
+static constexpr uint8_t KEY_PAUSE   = 0xF3;
+static constexpr uint8_t KEY_NEXT    = 0xF4;
+static constexpr uint8_t KEY_SKIP    = 0xF6;  // reserved, not currently used
+
 static constexpr uint8_t MAX_ROWS = 8;
 static constexpr uint8_t MAX_COLS = 8;
 class MacroPad; // Forward declaration for server callbacks
-using KeyEventHandler = bool (*)(uint8_t index, uint8_t key, bool pressed);
+using KeyEventHandler = bool (*)(uint8_t key, bool pressed);
 
 class MacroPadServerCallbacks : public BLEServerCallbacks {
 public:
