@@ -7,8 +7,8 @@ from bleak import BleakClient, BleakScanner
 
 TASK_SERVICE_UUID = "c3a7b7a0-3c1b-4d46-9f5c-9f0d9d1a9d01"
 TASK_CHAR_UUID = "c3a7b7a0-3c1b-4d46-9f5c-9f0d9d1a9d02"
-TERMINATOR = "--END--"
-CHUNK_SIZE = 180
+TERMINATOR = "\n--END--"
+CHUNK_SIZE = 20   # BLE ATT default payload limit; safe without MTU negotiation
 
 
 async def find_device(name: str, timeout: float) -> Optional[str]:
@@ -30,6 +30,7 @@ def chunk_payload(payload: str) -> List[bytes]:
 
 
 async def send_tasks(address: str, tasks: List[str]) -> None:
+    tasks = [t.upper() for t in tasks]  # font is uppercase-only
     payload = "\n".join(tasks) + TERMINATOR
     chunks = chunk_payload(payload)
     async with BleakClient(address) as client:

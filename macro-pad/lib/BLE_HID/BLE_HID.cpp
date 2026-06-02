@@ -69,6 +69,16 @@ void BLE_HID::begin(const char* deviceName) {
     _instance = this;
 
     BLEDevice::init(deviceName);
+
+    // HOGP requires bonding + encryption. Both Init (what we send) and Resp (what we
+    // accept from the peer) key masks must be set, otherwise the pairing handshake
+    // stalls waiting for keys that were never negotiated.
+    BLESecurity* security = new BLESecurity();
+    security->setAuthenticationMode(ESP_LE_AUTH_BOND);
+    security->setCapability(ESP_IO_CAP_NONE);  // "Just Works" — no PIN prompt
+    security->setInitEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
+    security->setRespEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
+
     _server = BLEDevice::createServer();
     _server->setCallbacks(new ServerCallbacks());
 
@@ -85,10 +95,8 @@ void BLE_HID::begin(const char* deviceName) {
     _advertising = _server->getAdvertising();
     _advertising->setAppearance(HID_KEYBOARD);
     _advertising->addServiceUUID(_hid->hidService()->getUUID());
+    _advertising->setScanResponse(true);
     _advertising->start();
-
-    Serial.print("Advertising as: ");
-    Serial.println(deviceName);
 }
 
 // USB HID keyboard page: 'a'=0x04 … 'z'=0x1D, '1'=0x1E … '9'=0x26, '0'=0x27

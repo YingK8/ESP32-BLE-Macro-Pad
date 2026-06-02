@@ -26,6 +26,8 @@ async def send(tasks: list[str]) -> None:
         print("Device not found — is the MacroPad on and advertising?")
         sys.exit(1)
 
+    # Font is uppercase-only; uppercase here so what you type matches what displays
+    tasks = [t.upper() for t in tasks]
     # Protocol: newline-separated task names, terminated with "--END--"
     payload = "\n".join(tasks) + "\n--END--"
     data    = payload.encode("utf-8")

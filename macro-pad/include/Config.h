@@ -9,7 +9,7 @@ static constexpr uint8_t ROWS = 2;
 static constexpr uint8_t COLS = 3;
 // Defined once in Config.cpp — avoids duplicate copies in every translation unit.
 extern const uint8_t ROW_PINS[ROWS];  // {1, 5}
-extern const uint8_t COL_PINS[COLS];  // {4, 20, 8}
+extern const uint8_t COL_PINS[COLS];  // {4, 21, 8}
 
 // Encoder
 static constexpr uint8_t PIN_ENCODER_A = 3;
@@ -22,7 +22,12 @@ static constexpr int PIN_TFT_MISO = -1;
 static constexpr int PIN_TFT_DC   = 2;
 static constexpr int PIN_TFT_CS   = 0;
 static constexpr int PIN_TFT_RST  = 9;
-static constexpr int PIN_TFT_BL   = 21;
+static constexpr int PIN_TFT_BL   = 20;
+static constexpr int     BRIGHTNESS        = 10;    // 0-255 PWM for backlight; ignored if PIN_TFT_BL < 0
+static constexpr uint8_t DIM_BRIGHTNESS    = 2;      // PWM when dimmed — low but not off
+static constexpr uint32_t DIM_TIMEOUT_MS   = 60000;  // ms idle before dimming
+static constexpr uint32_t SLEEP_TIMEOUT_MS = 300000; // ms in dim state before full off (5 min)
+static constexpr uint32_t SHIFT_INTERVAL_MS = 12000; // ms between pixel-shift steps (anti-burn)
 
 // Logical (post-rotation) dimensions; physical panel is portrait 240×280.
 static constexpr int TFT_WIDTH    = 280;

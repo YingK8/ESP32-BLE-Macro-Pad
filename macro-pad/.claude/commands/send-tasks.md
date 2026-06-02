@@ -4,7 +4,7 @@ Arguments: $ARGUMENTS
 
 Steps:
 1. Parse $ARGUMENTS as a space- or newline-separated list of task names.
-   - If it looks like a filename (ends in .txt), pass it with --file instead.
+   - If it looks like a file path, pass it with --file instead.
    - If no arguments, ask the user for a task list.
 2. Run the sender script from the project root:
    ```
@@ -19,7 +19,7 @@ Steps:
 Notes:
 - The MacroPad must be powered on and BLE advertising ("ESP32 MacroPad").
 - Requires: `pip install bleak`
-- Task names are automatically lowercased on the device (font only has lowercase glyphs).
-- Max 12 tasks, max 31 chars each.
+- Task names are uppercased automatically — the display font only has capital letters.
+- Max 12 tasks, max 31 chars each (longer names are silently truncated on device).
 - Service UUID:  c3a7b7a0-3c1b-4d46-9f5c-9f0d9d1a9d01
 - Char UUID:     c3a7b7a0-3c1b-4d46-9f5c-9f0d9d1a9d02
