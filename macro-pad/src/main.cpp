@@ -41,17 +41,13 @@ static bool markActivity() {
 
 BLE_HID ble;
 
-// Physical layout (2R × 3C), col pins = {GPIO4, GPIO21, GPIO8}:
-//   col:      0        1(DEAD)  2
-//   row 0:  [none]   [none]   [none]       GPIO1 × col  (row untested)
-//   row 1:  [PAUSE]  [none]   [NEXT]       GPIO5 × col  (row confirmed working)
-//
-// GPIO21 (col 1) = UART0 TX, permanently dead for input.
-// NEXT moved to (r1,c2) = GPIO5 × GPIO8 — both confirmed working.
-// Volume is handled by the encoder, so PLAY_PAUSE hardware button is unused.
+// Cols are outputs (driven LOW), rows are inputs (read). Key index = r*COLS+c unchanged.
+//   col driven:  GPIO4(c0)        GPIO21(c1)       GPIO8(c2)
+//   row 0 read:  [none]           [none]           [none]
+//   row 1 read:  [PAUSE]          [NEXT]           [PLAY_PAUSE] Key::none()
 static Key keymap[ROWS * COLS] = {
-    Key::none(),             Key::none(),  Key::none(),
-    Key::app(AppKey::PAUSE), Key::none(),  Key::app(AppKey::NEXT)
+    Key::app(AppKey::NEXT),             Key::app(AppKey::NEXT),             Key::app(AppKey::NEXT),
+    Key::app(AppKey::PAUSE), Key::app(AppKey::NEXT),  Key::media(MediaKey::PLAY_PAUSE)
 };
 
 MacroPad keypad(ble, keymap, ROWS, COLS, ROW_PINS, COL_PINS);
@@ -196,31 +192,6 @@ void loop() {
     while (delta > 0) { ble.sendMediaKey(MediaKey::VOL_DOWN); delta--; }
 
     handleTimer();
-
-    // ── Column 2 (GPIO8) pin debug ────────────────────────────────────────────
-    // Drives each row LOW in turn and reads GPIO8 analog + digital.
-    // With INPUT_PULLUP and no key pressed: analog ~4095, digital HIGH.
-    // With key pressed (row driven LOW through button): analog ~0, digital LOW.
-    // Prints every 300 ms so the serial monitor stays readable.
-    {
-        static unsigned long lastDbg = 0;
-        if (millis() - lastDbg > 300) {
-            lastDbg = millis();
-            pinMode(8, INPUT_PULLUP);
-
-            // Row 0 = GPIO1: drive LOW, read col 2 (GPIO8)
-            pinMode(1, OUTPUT); digitalWrite(1, LOW); delayMicroseconds(10);
-            int r0 = digitalRead(8);  // LOW(0)=pressed, HIGH(1)=open
-            digitalWrite(1, HIGH);
-
-            // Row 1 = GPIO5: drive LOW, read col 2 (GPIO8)
-            pinMode(5, OUTPUT); digitalWrite(5, LOW); delayMicroseconds(10);
-            int r1 = digitalRead(8);
-            digitalWrite(5, HIGH);
-
-            Serial.printf("[COL2] row0(GPIO1)=%d row1(GPIO5)=%d  (0=pressed 1=open)\n", r0, r1);
-        }
-    }
 
     static char payload[MAX_TASKS * TASK_MAX_LEN + 32];
     if (getNextTaskPayload(payload, sizeof(payload))) { applyTasks(payload); markActivity(); }
