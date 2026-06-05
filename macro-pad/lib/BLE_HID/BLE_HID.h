@@ -18,8 +18,9 @@ namespace MediaKey {
 class BLE_HID {
 public:
     void begin(const char* deviceName);
+    void tick();                          // call every loop() — flushes pending media-key release
     void sendKey(char key, bool pressed);
-    void sendMediaKey(uint16_t keyCode);  // pass a MediaKey:: constant directly
+    void sendMediaKey(uint16_t keyCode);  // pass a MediaKey:: constant directly; non-blocking
     bool isConnected() { return _isConnected; }
     void setConnected(bool state) { _isConnected = state; }
     BLEServer* server() const { return _server; }
@@ -34,6 +35,12 @@ private:
     bool               _isConnected   = false;
     BLEServer*         _server        = nullptr;
     BLEAdvertising*    _advertising   = nullptr;
+
+    // Non-blocking media-key release: press is sent immediately, release is sent
+    // by tick() ~MEDIA_RELEASE_MS later. Removes the 50ms delay that was stalling loop().
+    bool               _mediaReleasePending = false;
+    unsigned long      _mediaPressedAtMs    = 0;
+    static constexpr unsigned long MEDIA_RELEASE_MS = 20;
 };
 
 #endif

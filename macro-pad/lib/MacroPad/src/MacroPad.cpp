@@ -86,6 +86,5 @@ void MacroPad::handleKeypad() {
         }
 
         digitalWrite(_rowPins[r], HIGH);
-        delay(1);
     }
 }

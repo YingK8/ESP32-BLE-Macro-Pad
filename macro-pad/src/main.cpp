@@ -41,12 +41,12 @@ static bool markActivity() {
 
 BLE_HID ble;
 
-// Cols are outputs (driven LOW), rows are inputs (read). Key index = r*COLS+c unchanged.
-//   col driven:  GPIO4(c0)        GPIO21(c1)       GPIO8(c2)
-//   row 0 read:  [none]           [none]           [none]
-//   row 1 read:  [PAUSE]          [NEXT]           [PLAY_PAUSE] Key::none()
+// Rows driven LOW one at a time; cols read with INPUT_PULLUP. Index = r*COLS + c.
+//                  col0=GPIO4   col1=GPIO21   col2=GPIO8
+//   row0=GPIO1:    [none]       [none]        [none]
+//   row1=GPIO5:    [PAUSE]      [NEXT]        [PLAY_PAUSE]
 static Key keymap[ROWS * COLS] = {
-    Key::app(AppKey::NEXT),             Key::app(AppKey::NEXT),             Key::app(AppKey::NEXT),
+    Key::none(),             Key::none(),             Key::none(),
     Key::app(AppKey::PAUSE), Key::app(AppKey::NEXT),  Key::media(MediaKey::PLAY_PAUSE)
 };
 
@@ -59,7 +59,7 @@ static int           remainingSeconds   = 0;  // set in setup() from PHASES[curr
 static bool          timerRunning       = false;
 static bool          waitingForContinue = false;  // phase ended, waiting for key to advance
 static unsigned long lastSecondTick     = 0;
-static int           completedSessions  = 4;      // work phases finished; drives break-screen dots
+static int           completedSessions  = 0;      // work phases finished; drives break-screen dots
 
 // ----- Tasks -----
 static char   tasks[MAX_TASKS][TASK_MAX_LEN] = {
@@ -183,6 +183,7 @@ void setup() {
 }
 
 void loop() {
+    ble.tick();  // flush any deferred media-key release from the previous iteration
     keypad.handleKeypad();
 
     encoder.handle();
