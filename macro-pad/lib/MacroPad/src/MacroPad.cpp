@@ -66,6 +66,9 @@ void MacroPad::handleKeypad() {
                                 case KeyType::MEDIA:
                                     _ble.sendMediaKey(key._media);
                                     break;
+                                case KeyType::COMBO:
+                                    _ble.sendCombo(key._combo >> 8, key._combo & 0xFF, true);
+                                    break;
                                 case KeyType::STRING:
                                     // type each character as a press+release pair
                                     for (const char* p = key._str; *p; p++) {
@@ -78,6 +81,8 @@ void MacroPad::handleKeypad() {
                             }
                         } else if (key.type == KeyType::CHAR) {
                             _ble.sendKey(key._ch, false);  // key-up for held chars
+                        } else if (key.type == KeyType::COMBO) {
+                            _ble.sendCombo(0, 0, false);   // key-up clears mods + keycode
                         }
                     }
                 }

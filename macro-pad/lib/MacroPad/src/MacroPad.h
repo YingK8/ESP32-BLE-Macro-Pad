@@ -6,7 +6,7 @@
 
 // ── Key type system ───────────────────────────────────────────────────────────
 
-enum class KeyType : uint8_t { NONE, CHAR, MEDIA, STRING, APP };
+enum class KeyType : uint8_t { NONE, CHAR, MEDIA, STRING, APP, COMBO };
 
 struct Key {
     KeyType type = KeyType::NONE;
@@ -15,6 +15,7 @@ struct Key {
         uint16_t    _media;
         const char* _str;
         uint8_t     _app;
+        uint16_t    _combo;  // modifier bitmap << 8 | HID keycode
     };
 
     static Key none()               { Key k; k.type = KeyType::NONE;               return k; }
@@ -22,6 +23,10 @@ struct Key {
     static Key media(uint16_t code) { Key k; k.type = KeyType::MEDIA;  k._media = code; return k; }
     static Key str(const char* s)   { Key k; k.type = KeyType::STRING; k._str   = s;    return k; }
     static Key app(uint8_t code)    { Key k; k.type = KeyType::APP;    k._app   = code; return k; }
+    // Modifier shortcut, e.g. Key::combo(Mod::LCTRL | Mod::LALT, BLE_HID::charToHidCode('t'))
+    static Key combo(uint8_t mods, uint8_t code) {
+        Key k; k.type = KeyType::COMBO; k._combo = (uint16_t)(mods << 8) | code; return k;
+    }
 };
 
 // App-level key codes — consumed by the KeyEventHandler, never sent over BLE
@@ -38,15 +43,6 @@ static constexpr uint8_t MAX_COLS = 8;
 
 class MacroPad;
 using KeyEventHandler = bool (*)(const Key& key, bool pressed);
-
-class MacroPadServerCallbacks : public BLEServerCallbacks {
-public:
-    explicit MacroPadServerCallbacks(MacroPad* pad) : _pad(pad) {}
-    void onConnect(BLEServer* pServer) override;
-    void onDisconnect(BLEServer* pServer) override;
-private:
-    MacroPad* _pad;
-};
 
 class MacroPad {
 public:
@@ -77,14 +73,11 @@ private:
     unsigned long _lastDebounceTime[MAX_ROWS * MAX_COLS];
     KeyEventHandler _handler = nullptr;
 
-    BLEHIDDevice*      _hid           = nullptr;
-    BLECharacteristic* _keyboardInput = nullptr;
-    BLECharacteristic* _mediaInput    = nullptr;
-    bool               _isConnected   = false;
+    // NOTE: _isConnected has no writer since BLE moved to BLE_HID — connected() is
+    // always false. Dead code; kept only so the public API doesn't change this commit.
+    bool _isConnected = false;
 
     static constexpr unsigned long DEBOUNCE_DELAY_MS = 50;
-
-    friend class MacroPadServerCallbacks;
 };
 
 #endif // MACRO_PAD_H

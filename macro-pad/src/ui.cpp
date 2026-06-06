@@ -186,8 +186,8 @@ void updateTimer(int remainingSecs, const char* phase, bool running,
     // Dark backgrounds keep most pixels off, reducing image retention.
     // Work: near-black + warm white text. Rest: dark green tint + cool white text.
     bool isWork = (strcmp(phase,"WORK") == 0);
-    lv_obj_set_style_bg_color(lv_scr_act(), lv_color_hex(isWork ? 0xFF8A00 : 0x0088D7), 0);
-    lv_obj_set_style_text_color(mainLabel,  lv_color_hex(isWork ? 0x000000 : 0xEEEEEE), 0);
+    lv_obj_set_style_bg_color(lv_scr_act(), lv_color_hex(isWork ? 0x000000 : 0x000000), 0);
+    lv_obj_set_style_text_color(mainLabel,  lv_color_hex(isWork ? 0xEEEEEE : 0xEEEEEE), 0);
 
     buildScreen();
 }

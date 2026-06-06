@@ -1,5 +1,4 @@
-#include "BLE_HID.h"
-#include <BLESecurity.h>
+#include "BLE_HID.h"  // NimBLE security is configured via static NimBLEDevice calls — no BLESecurity object
 
 static const uint8_t hidReportDescriptor[] = {
   // Keyboard Collection
@@ -54,15 +53,19 @@ static const uint8_t hidReportDescriptor[] = {
 
 static BLE_HID* _instance = nullptr;
 
-class ServerCallbacks : public BLEServerCallbacks {
-    void onConnect(BLEServer*) override {
+// NimBLE callbacks receive NimBLEConnInfo (peer address, etc.) — unused here but required by the signatures
+class ServerCallbacks : public NimBLEServerCallbacks {
+    void onConnect(NimBLEServer*, NimBLEConnInfo&) override {
         _instance->setConnected(true);
-        Serial.println("BLE connected");
+        Serial.println("BLE connected — keeping advertising on");
+        // Keep advertising while connected so config tools (send_tasks.py) can still
+        // discover us when a host holds the HID connection. Bluedroid couldn't do this.
+        NimBLEDevice::startAdvertising();
     }
-    void onDisconnect(BLEServer*) override {
+    void onDisconnect(NimBLEServer*, NimBLEConnInfo&, int reason) override {
         _instance->setConnected(false);
-        Serial.println("BLE disconnected — restarting advertising");
-        BLEDevice::startAdvertising();
+        Serial.printf("BLE disconnected (reason %d) — restarting advertising\n", reason);
+        NimBLEDevice::startAdvertising();
     }
 };
 
@@ -72,46 +75,47 @@ void BLE_HID::begin(const char* deviceName) {
     // Tracing prints — if the device boot-loops or hangs, the last line you see
     // on serial pinpoints which step crashed.
     Serial.println("[BLE] init");
-    BLEDevice::init(deviceName);
+    NimBLEDevice::init(deviceName);
 
     Serial.println("[BLE] security");
-    BLESecurity* security = new BLESecurity();
-    security->setAuthenticationMode(ESP_LE_AUTH_BOND);   // back to legacy "Just Works" bonding
-    security->setCapability(ESP_IO_CAP_NONE);
-    security->setInitEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
-    security->setRespEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
+    // (bond, mitm, secure-connections) — "Just Works" bonding, no PIN; key distribution is automatic
+    NimBLEDevice::setSecurityAuth(true, false, true);
+    NimBLEDevice::setSecurityIOCap(BLE_HS_IO_NO_INPUT_OUTPUT);
 
     Serial.println("[BLE] server");
-    _server = BLEDevice::createServer();
+    _server = NimBLEDevice::createServer();
     _server->setCallbacks(new ServerCallbacks());
 
     Serial.println("[BLE] hid device");
-    _hid = new BLEHIDDevice(_server);
-    _hid->manufacturer()->setValue("ESP32");
-    _hid->pnp(0x02, 0xe502, 0xa111, 0x0210);
-    _hid->hidInfo(0x00, 0x01);
-    _hid->reportMap((uint8_t*)hidReportDescriptor, sizeof(hidReportDescriptor));
+    _hid = new NimBLEHIDDevice(_server);
+    _hid->setManufacturer("ESP32");                       // NimBLE renamed the HID setters: x() -> setX()
+    _hid->setPnp(0x02, 0xe502, 0xa111, 0x0210);
+    _hid->setHidInfo(0x00, 0x01);
+    _hid->setReportMap((uint8_t*)hidReportDescriptor, sizeof(hidReportDescriptor));
 
-    _keyboardInput = _hid->inputReport(1);
-    _mediaInput    = _hid->inputReport(2);
+    _keyboardInput = _hid->getInputReport(1);
+    _mediaInput    = _hid->getInputReport(2);
 
     Serial.println("[BLE] start services");
     _hid->startServices();
+    // (the Bluedroid setBatteryLevel-before-startServices crash doesn't apply to NimBLE;
+    //  still skipping battery level — macOS/iOS don't need it)
 
-    // setBatteryLevel() internally calls notify() on the battery characteristic.
-    // If called BEFORE startServices(), the characteristic's CCCD isn't fully
-    // initialized yet — notify() then dereferences a half-built object and the
-    // CPU traps (load access fault on 0x4540002f, MCAUSE=5). The fix is to call
-    // it AFTER startServices(). Safe to skip on macOS/iOS; mainly for Windows.
-    // _hid->setBatteryLevel(100);
+    Serial.println("[BLE] advertising config");
+    _advertising = NimBLEDevice::getAdvertising();
+    _advertising->setAppearance(0x03C1);                  // GAP appearance: HID keyboard (Bluedroid's HID_KEYBOARD macro)
+    _advertising->setName(deviceName);                    // NimBLE doesn't auto-include the name — send_tasks.py scans by it
+    _advertising->addServiceUUID(_hid->getHidService()->getUUID());
+    _advertising->enableScanResponse(true);               // renamed from setScanResponse(); name spills into scan-response packet
+    // NOTE: advertising is NOT started here. NimBLE finalizes the GATT table when the
+    // server starts, so every service (e.g. TaskSync) must be registered first.
+    // Call startAdvertising() from setup() once all services exist.
+}
 
-    Serial.println("[BLE] advertising");
-    _advertising = _server->getAdvertising();
-    _advertising->setAppearance(HID_KEYBOARD);
-    _advertising->addServiceUUID(_hid->hidService()->getUUID());
-    _advertising->setScanResponse(true);
+// Start advertising — call only after ALL services are registered.
+void BLE_HID::startAdvertising() {
     _advertising->start();
-    Serial.printf("[BLE] advertising as \"%s\"\n", deviceName);
+    Serial.println("[BLE] advertising started");
 }
 
 // USB HID keyboard page: 'a'=0x04 … 'z'=0x1D, '1'=0x1E … '9'=0x26, '0'=0x27
@@ -143,6 +147,16 @@ void BLE_HID::sendKey(char key, bool pressed) {
         uint8_t report[] = { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
         _keyboardInput->setValue(report, sizeof(report));
     }
+    _keyboardInput->notify();
+}
+
+// Modifier shortcut (e.g. Ctrl+Alt+T): mods in report byte 0, keycode in byte 2.
+// Release must zero BOTH — a lingering modifier byte leaves the host thinking Ctrl is held.
+void BLE_HID::sendCombo(uint8_t mods, uint8_t hidCode, bool pressed) {
+    if (!_isConnected) return;
+    uint8_t report[8] = {0};
+    if (pressed) { report[0] = mods; report[2] = hidCode; }
+    _keyboardInput->setValue(report, sizeof(report));
     _keyboardInput->notify();
 }
 

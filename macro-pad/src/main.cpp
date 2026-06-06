@@ -42,11 +42,14 @@ static bool markActivity() {
 BLE_HID ble;
 
 // Rows driven LOW one at a time; cols read with INPUT_PULLUP. Index = r*COLS + c.
-//                  col0=GPIO4   col1=GPIO21   col2=GPIO8
-//   row0=GPIO1:    [none]       [none]        [none]
-//   row1=GPIO5:    [PAUSE]      [NEXT]        [PLAY_PAUSE]
+//                  col0=GPIO4    col1=GPIO21    col2=GPIO8
+//   row0=GPIO1:    [SCREENSHOT]  [SCREEN REC]   [TERMINAL]
+//   row1=GPIO5:    [PAUSE]       [NEXT]         [PLAY_PAUSE]
 static Key keymap[ROWS * COLS] = {
-    Key::none(),             Key::none(),             Key::none(),
+    // GNOME shortcuts: Print = screenshot UI, Ctrl+Shift+Alt+R = screencast toggle, Ctrl+Alt+T = terminal
+    Key::combo(0, HidKey::PRINT_SCREEN),
+    Key::combo(Mod::LCTRL | Mod::LSHIFT | Mod::LALT, BLE_HID::charToHidCode('r')),
+    Key::combo(Mod::LCTRL | Mod::LALT,               BLE_HID::charToHidCode('t')),
     Key::app(AppKey::PAUSE), Key::app(AppKey::NEXT),  Key::media(MediaKey::PLAY_PAUSE)
 };
 
@@ -173,6 +176,7 @@ void setup() {
     Serial.begin(115200);
     ble.begin("ESP32 MacroPad");
     setupTaskService(ble);
+    ble.startAdvertising();  // last: NimBLE freezes the GATT table once the server starts
     keypad.begin();
     keypad.setKeyHandler(handleKeyEvent);
     encoder.begin();

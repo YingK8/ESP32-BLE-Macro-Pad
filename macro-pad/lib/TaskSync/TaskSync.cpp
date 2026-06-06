@@ -1,8 +1,4 @@
-#include "TaskSync.h"
-#include <BLEServer.h>
-#include <BLEService.h>
-#include <BLECharacteristic.h>
-#include <BLEAdvertising.h>
+#include "TaskSync.h"   // pulls in NimBLEDevice.h via BLE_HID.h
 #include <string.h>
 
 // Max bytes for a full task payload (MAX_TASKS × TASK_MAX_LEN + newlines + terminator).
@@ -26,15 +22,15 @@ static void enqueue(const char* data, size_t len) {
 }
 
 // Accumulates chunked BLE writes (typically 20 bytes each) until "--END--" is received.
-class TaskCharacteristicCallbacks : public BLECharacteristicCallbacks {
+class TaskCharacteristicCallbacks : public NimBLECharacteristicCallbacks {
 public:
-    void onWrite(BLECharacteristic* ch) override {
-        String val = ch->getValue();  // BLE library forces String here; convert immediately
-        if (val.isEmpty()) return;
-        size_t vlen = val.length();
+    void onWrite(NimBLECharacteristic* ch, NimBLEConnInfo&) override {
+        NimBLEAttValue val = ch->getValue();  // no Arduino String — no heap churn in the callback
+        if (val.size() == 0) return;
+        size_t vlen = val.size();
         size_t blen = strlen(_buf);
         if (blen + vlen < BUF_SIZE - 1) {
-            memcpy(_buf + blen, val.c_str(), vlen);
+            memcpy(_buf + blen, val.data(), vlen);
             _buf[blen + vlen] = '\0';
         }
         const char* term = strstr(_buf, "--END--");
@@ -48,17 +44,18 @@ private:
 };
 
 void setupTaskService(BLE_HID& ble) {
-    BLEServer* server = ble.server();
+    NimBLEServer* server = ble.server();
     if (!server) return;
-    BLEService* service = server->createService(TASK_SERVICE_UUID);
-    BLECharacteristic* ch = service->createCharacteristic(
+    NimBLEService* service = server->createService(TASK_SERVICE_UUID);
+    NimBLECharacteristic* ch = service->createCharacteristic(
         TASK_CHAR_UUID,
-        BLECharacteristic::PROPERTY_WRITE | BLECharacteristic::PROPERTY_WRITE_NR
+        NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR  // properties moved to the NIMBLE_PROPERTY enum
     );
     ch->setCallbacks(new TaskCharacteristicCallbacks());
     service->start();
-    BLEAdvertising* adv = ble.advertising();
-    if (adv) { adv->addServiceUUID(TASK_SERVICE_UUID); adv->start(); }
+    // Only register the UUID — main.cpp starts advertising once every service exists
+    NimBLEAdvertising* adv = ble.advertising();
+    if (adv) adv->addServiceUUID(TASK_SERVICE_UUID);
 }
 
 bool getNextTaskPayload(char* out, size_t maxLen) {
