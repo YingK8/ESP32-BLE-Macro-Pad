@@ -108,7 +108,7 @@ void BLE_HID::begin(const char* deviceName) {
     _advertising->addServiceUUID(_hid->getHidService()->getUUID());
     _advertising->enableScanResponse(true);               // renamed from setScanResponse(); name spills into scan-response packet
     // NOTE: advertising is NOT started here. NimBLE finalizes the GATT table when the
-    // server starts, so every service (e.g. TaskSync) must be registered first.
+    // server starts, so every service must be registered first.
     // Call startAdvertising() from setup() once all services exist.
 }
 
