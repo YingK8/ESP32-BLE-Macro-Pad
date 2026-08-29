@@ -1,25 +1,27 @@
-Send a task list to the ESP32 MacroPad over BLE.
+Send a task list to the ESP32 MacroPad.
 
 Arguments: $ARGUMENTS
 
 Steps:
 1. Parse $ARGUMENTS as a space- or newline-separated list of task names.
    - If it looks like a file path, pass it with --file instead.
-   - If no arguments, ask the user for a task list.
-2. Run the sender script from the project root:
+   - If no arguments, run the command with no task arguments to print the current list.
+2. Run from `macro-pad/host/`:
    ```
-   python tools/send_tasks.py <task1> <task2> ...
+   uv run macropad tasks "<task1>" "<task2>" ...
    ```
    or for a file:
    ```
-   python tools/send_tasks.py --file <filename>
+   uv run macropad tasks --file <filename>
    ```
-3. Report whether the send succeeded or failed.
+3. Report whether the write succeeded, and how many tasks were stored.
 
 Notes:
-- The MacroPad must be powered on and BLE advertising ("ESP32 MacroPad").
-- Requires: `pip install bleak`
-- Task names are uppercased automatically — the display font only has capital letters.
-- Max 12 tasks, max 31 chars each (longer names are silently truncated on device).
-- Service UUID:  c3a7b7a0-3c1b-4d46-9f5c-9f0d9d1a9d01
-- Char UUID:     c3a7b7a0-3c1b-4d46-9f5c-9f0d9d1a9d02
+- Tasks are written to `~/Library/Application Support/macropad-host/tasks.json`.
+  A running `macropad run` picks the change up within ~2 seconds; the pad does not
+  need to be connected at the time.
+- The pomodoro app renders the list under the timer. Encoder scrolls the selection,
+  ACTION_B ticks the selected task off.
+- No length or count limit: the host wraps text to the panel and drops whatever
+  runs past the bottom, so put the important tasks first.
+- Mixed case is fine — the built-in font has lowercase.

@@ -1,0 +1,36 @@
+[project]
+name = "macropad-host"
+version = "0.1.0"
+description = "Desktop companion that renders productivity apps to the ESP32 MacroPad's ST7789 screen"
+requires-python = ">=3.11"
+
+# Every capability here comes from an existing package -- nothing is hand-rolled.
+dependencies = [
+    "pyserial>=3.5",            # USB CDC transport
+    "pluggy>=1.5",              # app plugin system (pytest's)
+    "apscheduler>=3.10",        # periodic app refresh + pomodoro timing
+    "pydantic-settings>=2.4",   # TOML/env config with validation
+    "platformdirs>=4.2",        # per-OS config location
+    "psutil>=6.0",              # sysstats app
+    "icalendar>=6.0",           # agenda app: .ics parsing
+    "recurring-ical-events>=3.2",  # agenda app: expands RRULEs into occurrences
+    "httpx>=0.27",              # fetching remote .ics feeds
+    "canvasapi>=3.2",           # agenda app: bCourses assignments
+    "rumps>=0.4.0; sys_platform == 'darwin'",  # macOS menubar UI
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+macropad = "macropad_host.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/macropad_host"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

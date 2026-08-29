@@ -29,11 +29,14 @@ struct Key {
     }
 };
 
-// App-level key codes — consumed by the KeyEventHandler, never sent over BLE
+// App-level key codes — consumed by the KeyEventHandler, never sent over BLE.
+// These ids travel to the host verbatim; keep them in sync with KEY_* in
+// host/src/macropad_host/api.py.
 namespace AppKey {
-    static constexpr uint8_t PAUSE = 0x01;
-    static constexpr uint8_t NEXT  = 0x02;
-    static constexpr uint8_t SKIP  = 0x03;  // reserved
+    static constexpr uint8_t PREV     = 0;  // previous app  (handled by the host runtime)
+    static constexpr uint8_t NEXT     = 1;  // next app      (handled by the host runtime)
+    static constexpr uint8_t ACTION_A = 2;  // primary action, meaning depends on the active app
+    static constexpr uint8_t ACTION_B = 3;  // secondary action
 }
 
 // ── MacroPad class ────────────────────────────────────────────────────────────
@@ -58,7 +61,6 @@ public:
     void begin();
     void handleKeypad();
     void setKeyHandler(KeyEventHandler handler) { _handler = handler; }
-    bool connected() const { return _isConnected; }
 
 private:
     BLE_HID& _ble;
@@ -72,10 +74,6 @@ private:
     bool          _lastButtonState[MAX_ROWS * MAX_COLS];
     unsigned long _lastDebounceTime[MAX_ROWS * MAX_COLS];
     KeyEventHandler _handler = nullptr;
-
-    // NOTE: _isConnected has no writer since BLE moved to BLE_HID — connected() is
-    // always false. Dead code; kept only so the public API doesn't change this commit.
-    bool _isConnected = false;
 
     static constexpr unsigned long DEBOUNCE_DELAY_MS = 50;
 };

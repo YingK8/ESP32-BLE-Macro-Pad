@@ -4,7 +4,7 @@ Encoder* Encoder::_instance = nullptr;
 
 Encoder::Encoder(BLE_HID& ble, uint8_t pinA, uint8_t pinB)
     : _ble(ble),
-      _encoder(pinA, pinB, RotaryEncoder::LatchMode::TWO03),
+      _encoder(pinA, pinB, RotaryEncoder::LatchMode::FOUR3),  // 1 count per detent on EC11-style encoders (TWO03 gave 2)
       _pinA(pinA), _pinB(pinB),
       _oldPos(0)
 {}
